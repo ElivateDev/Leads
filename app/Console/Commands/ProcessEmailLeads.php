@@ -13,7 +13,6 @@ class ProcessEmailLeads extends Command
      * @var string
      */
     protected $signature = 'leads:process-emails
-                          {--dry-run : Run without creating leads}
                           {--limit=50 : Maximum number of emails to process}';
 
     /**
@@ -24,20 +23,28 @@ class ProcessEmailLeads extends Command
     protected $description = 'Process emails from inbox and create leads';
 
     /**
+     * The email lead processor instance.
+     */
+    protected EmailLeadProcessor $processor;
+
+    /**
+     * Create a new command instance.
+     */
+    public function __construct(EmailLeadProcessor $processor)
+    {
+        parent::__construct();
+        $this->processor = $processor;
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle(): int
     {
         $this->info('Starting email lead processing...');
 
-        if ($this->option('dry-run')) {
-            $this->warn('DRY RUN MODE - No leads will be created');
-        }
-
         try {
-            // Create the processor instance directly
-            $processor = new EmailLeadProcessor();
-            $leads = $processor->processNewEmails();
+            $leads = $this->processor->processNewEmails();
 
             if (empty($leads)) {
                 $this->info('No new leads found in email inbox.');

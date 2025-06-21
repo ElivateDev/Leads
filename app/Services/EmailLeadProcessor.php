@@ -3,14 +3,12 @@
 namespace App\Services;
 
 use App\Models\Lead;
-use App\Models\Client;
 use PhpImap\Mailbox;
-use PhpImap\IncomingMail;
-use ZBateson\MailMimeParser\Message;
-use ZBateson\MailMimeParser\Header\AddressHeader;
-use League\HTMLToMarkdown\HtmlConverter;
-use Illuminate\Support\Facades\Log;
+use App\Models\Client;
 use Illuminate\Support\Str;
+use TheIconic\NameParser\Parser;
+use Illuminate\Support\Facades\Log;
+use League\HTMLToMarkdown\HtmlConverter;
 
 class EmailLeadProcessor
 {
@@ -43,16 +41,23 @@ class EmailLeadProcessor
         $processed = [];
 
         try {
-            // Get the raw IMAP stream to avoid encoding issues
-            $imapStream = $this->mailbox->getImapStream();
-
-            // Use native PHP IMAP functions to avoid the encoding issue
-            $allMails = imap_search($imapStream, 'ALL', SE_UID);
-            $allMailIds = $allMails ? $allMails : [];
-            Log::info('Total emails in inbox: ' . count($allMailIds));
-            echo "Total emails found: " . count($allMailIds) . "\n";
-
-            $unseenMails = imap_search($imapStream, 'UNSEEN', SE_UID);
+            $config = config('services.imap');
+            $connectionString = sprintf(
+                '{%s:%d/imap/%s/novalidate-cert}%s',
+                $config['host'],
+                $config['port'],
+                $config['encryption'],
+                $config['default_folder']
+            );
+            $imapConnection = imap_open(
+                $connectionString,
+                $config['username'],
+                $config['password']
+            );
+            if (!$imapConnection) {
+                throw new \Exception('Could not connect to IMAP: ' . imap_last_error());
+            }
+            $unseenMails = imap_search($imapConnection, 'UNSEEN', SE_UID);
             $mailIds = $unseenMails ? $unseenMails : [];
             Log::info('Found ' . count($mailIds) . ' unread emails to process');
             echo "Unread emails found: " . count($mailIds) . "\n";
@@ -61,21 +66,17 @@ class EmailLeadProcessor
                 try {
                     echo "Processing email ID: $mailId\n";
 
-                    // Use raw PHP IMAP functions instead of the library
-                    $header = imap_headerinfo($imapStream, $mailId);
-                    $body = imap_body($imapStream, $mailId);
+                    $header = imap_headerinfo($imapConnection, $mailId);
+                    $body = imap_body($imapConnection, $mailId);
 
-                    // Create a simple email object
                     $email = (object) [
                         'fromAddress' => $header->from[0]->mailbox . '@' . $header->from[0]->host,
                         'fromName' => $header->from[0]->personal ?? '',
                         'subject' => $header->subject ?? '',
                         'textPlain' => $body,
-                        'textHtml' => '',
-                        'date' => $header->date ?? date('r'),
                     ];
+                    imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
 
-                    echo "Email from: " . $email->fromAddress . " Subject: " . $email->subject . "\n";
                     Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
 
                     $lead = $this->processEmail($email);
@@ -83,15 +84,13 @@ class EmailLeadProcessor
                     if ($lead) {
                         echo "✓ Lead created successfully\n";
                         $processed[] = $lead;
-                        // Mark as read using raw IMAP
-                        imap_setflag_full($imapStream, $mailId, "\\Seen", ST_UID);
                     } else {
                         echo "✗ No lead created - check processEmail() method\n";
                     }
 
                 } catch (\Exception $e) {
-                    echo "✗ Error processing email: " . $e->getMessage() . "\n";
                     Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage());
+                    echo "✗ Error processing email ID $mailId: " . $e->getMessage() . "\n";
                 }
             }
 
@@ -107,40 +106,42 @@ class EmailLeadProcessor
 
     private function processEmail($email): ?Lead
     {
-        // Extract sender information
         $senderEmail = $email->fromAddress;
-        $senderName = $email->fromName ?: $this->extractNameFromEmail($senderEmail);
+        $senderName = $email->fromName ?: 'Unknown Sender';
+        $leadName = $this->extractNameFromEmail($email);
+        $leadEmail = $this->extractEmailAddressFromEmail($email);
 
         echo "  - Sender: $senderName ($senderEmail)\n";
+        echo "  - Name: $leadName\n";
 
-        // Skip if no sender email
+        if (!$leadName) {
+            echo "  ✗ No lead name extracted, skipping\n";
+            Log::warning('Email without lead name, skipping');
+            return null;
+        }
+
         if (!$senderEmail) {
             echo "  ✗ No sender email, skipping\n";
             Log::warning('Email without sender address, skipping');
             return null;
         }
 
-        // Check if this is an automated email we should ignore
         if ($this->shouldIgnoreEmail($email)) {
             echo "  ✗ Automated email, skipping\n";
             Log::info('Ignoring automated email from: ' . $senderEmail);
             return null;
         }
 
-        // Extract phone number from email content
         $phoneNumber = $this->extractPhoneNumber($email);
         echo "  - Phone extracted: " . ($phoneNumber ?: 'none') . "\n";
 
-        // Get email content
         $message = $this->extractMessage($email);
         echo "  - Message length: " . strlen($message) . " characters\n";
         echo "  - Message preview: " . substr($message, 0, 100) . "...\n";
 
-        // Determine lead source
         $source = $this->determineLeadSource($email);
         echo "  - Source: $source\n";
 
-        // Find or use default client
         $client = $this->findClientForEmail($email) ?: $this->getDefaultClient();
 
         if (!$client) {
@@ -151,7 +152,6 @@ class EmailLeadProcessor
 
         echo "  - Client: {$client->name} (ID: {$client->id})\n";
 
-        // Check if lead already exists
         if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
             echo "  ✗ Lead already exists\n";
             Log::info('Lead already exists for: ' . $senderEmail);
@@ -160,17 +160,16 @@ class EmailLeadProcessor
 
         echo "  ✓ All checks passed, creating lead\n";
 
-        // Create lead with email metadata
         $lead = Lead::create([
             'client_id' => $client->id,
-            'name' => $senderName,
-            'email' => $senderEmail,
+            'name' => $leadName,
+            'email' => $leadEmail,
             'phone' => $phoneNumber,
             'message' => $message,
             'status' => 'new',
             'source' => $source,
             'email_subject' => $email->subject,
-            'email_received_at' => $email->date ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
+            'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
         ]);
 
         Log::info('Created new lead from email: ' . $senderEmail);
@@ -178,14 +177,38 @@ class EmailLeadProcessor
         return $lead;
     }
 
-    private function extractNameFromEmail(string $email): string
+    private function extractNameFromEmail($email): string
     {
-        // Extract name from email address (part before @)
-        $name = explode('@', $email)[0];
+        $parser = new Parser();
+        $text = $email->textPlain;
 
-        // Replace dots and underscores with spaces, then title case
-        $name = str_replace(['.', '_', '-'], ' ', $name);
-        return Str::title($name);
+        // Convert HTML breaks to newlines and strip HTML tags
+        $text = str_replace(['<br>', '<br/>', '<br />'], "\n", $text);
+        $text = strip_tags($text);
+
+        // Look for name patterns
+        if (preg_match('/Name:\s*(.+)/i', $text, $matches)) {
+            try {
+                $name = $parser->parse(trim($matches[1]));
+                return $name->getFullName();
+            } catch (\Exception $e) {
+                // Fallback to original match if parsing fails
+                return trim($matches[1]);
+            }
+        }
+
+        // Use fromName if available
+        if (!empty($email->fromName)) {
+            try {
+                $name = $parser->parse($email->fromName);
+                return $name->getFullName();
+            } catch (\Exception $e) {
+                return $email->fromName;
+            }
+        }
+
+        // Fallback logic...
+        return 'Unknown Sender';
     }
 
     private function shouldIgnoreEmail($email): bool
@@ -209,15 +232,14 @@ class EmailLeadProcessor
             }
         }
 
-        // Remove the headerInfo check since it doesn't exist
         return false;
     }
 
     private function extractPhoneNumber($email): ?string
     {
-        $text = $email->textPlain . ' ' . strip_tags($email->textHtml);
+        $text = $email->textPlain . ' ' .
+            (isset($email->textHtml) ? strip_tags($email->textHtml) : '');
 
-        // Common phone number patterns
         $patterns = [
             '/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/', // US format
             '/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/',       // Simple format
@@ -226,7 +248,6 @@ class EmailLeadProcessor
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $text, $matches)) {
-                // Clean up the phone number
                 return preg_replace('/[^\d+]/', '', $matches[1]);
             }
         }
@@ -238,22 +259,32 @@ class EmailLeadProcessor
     {
         $message = '';
 
-        // Our simple object only has textPlain
         if (!empty($email->textPlain)) {
             $message = $email->textPlain;
         }
 
-        // Add subject if it's informative
         $subject = $email->subject ?? '';
         if ($subject && !Str::contains(strtolower($subject), ['contact', 'inquiry', 'message'])) {
             $message = "Subject: {$subject}\n\n" . $message;
         }
 
-        // Limit message length - use simple substr instead of Str::limit
-        if (strlen($message) > 1000) {
-            $message = substr($message, 0, 1000) . '...';
+        $message = str_replace(['<br>', '<br/>', '<br />'], "\n", $message);
+
+        if (isset($email->textHtml)) {
+            $htmlText = $this->htmlConverter->convert($email->textHtml);
+            $message .= "\n\n" . $htmlText;
         }
 
+        $message = strip_tags($message);
+        $message = trim($message);
+
+        if (empty($message)) {
+            $message = 'No message content provided.';
+        }
+
+        if (strlen($message) > 5000) {
+            $message = substr($message, 0, 5000) . '...';
+        }
         return $message;
     }
 
@@ -262,7 +293,6 @@ class EmailLeadProcessor
         $subject = strtolower($email->subject ?? '');
         $fromEmail = strtolower($email->fromAddress);
 
-        // Check for common form sources
         if (Str::contains($subject, ['contact form', 'website', 'inquiry', 'message'])) {
             return 'website';
         }
@@ -276,11 +306,9 @@ class EmailLeadProcessor
 
     private function findClientForEmail($email): ?Client
     {
-        // Try to match client by sender domain or specific patterns
         $fromEmail = $email->fromAddress;
         $domain = explode('@', $fromEmail)[1] ?? '';
 
-        // Check if there's a client with this email domain in their company field
         $client = Client::where('email', 'LIKE', "%@{$domain}")
             ->orWhere('company', 'LIKE', "%{$domain}%")
             ->first();
@@ -307,5 +335,16 @@ class EmailLeadProcessor
         }
 
         return $query->exists();
+    }
+
+    private function extractEmailAddressFromEmail($email): string
+    {
+        // Try to extract from the body first
+        $text = $email->textPlain ?? '';
+        if (preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $text, $matches)) {
+            return $matches[0];
+        }
+        // Fallback to the sender's address
+        return $email->fromAddress ?? '';
     }
 }

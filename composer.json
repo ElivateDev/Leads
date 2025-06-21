@@ -12,6 +12,7 @@
         "laravel/tinker": "^2.10.1",
         "league/html-to-markdown": "^5.1",
         "php-imap/php-imap": "^5.0",
+        "theiconic/name-parser": "^1.2",
         "zbateson/mail-mime-parser": "^3.0"
     },
     "require-dev": {
