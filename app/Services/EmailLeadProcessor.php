@@ -60,7 +60,21 @@ class EmailLeadProcessor
             foreach ($mailIds as $mailId) {
                 try {
                     echo "Processing email ID: $mailId\n";
-                    $email = $this->mailbox->getMail($mailId, false);
+
+                    // Use raw PHP IMAP functions instead of the library
+                    $header = imap_headerinfo($imapStream, $mailId);
+                    $body = imap_body($imapStream, $mailId);
+
+                    // Create a simple email object
+                    $email = (object) [
+                        'fromAddress' => $header->from[0]->mailbox . '@' . $header->from[0]->host,
+                        'fromName' => $header->from[0]->personal ?? '',
+                        'subject' => $header->subject ?? '',
+                        'textPlain' => $body,
+                        'textHtml' => '',
+                        'date' => $header->date ?? date('r'),
+                    ];
+
                     echo "Email from: " . $email->fromAddress . " Subject: " . $email->subject . "\n";
                     Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
 
@@ -69,7 +83,8 @@ class EmailLeadProcessor
                     if ($lead) {
                         echo "✓ Lead created successfully\n";
                         $processed[] = $lead;
-                        $this->mailbox->markMailAsRead($mailId);
+                        // Mark as read using raw IMAP
+                        imap_setflag_full($imapStream, $mailId, "\\Seen", ST_UID);
                     } else {
                         echo "✗ No lead created - check processEmail() method\n";
                     }
@@ -90,7 +105,7 @@ class EmailLeadProcessor
         return $processed;
     }
 
-    private function processEmail(IncomingMail $email): ?Lead
+    private function processEmail($email): ?Lead
     {
         // Extract sender information
         $senderEmail = $email->fromAddress;
@@ -173,7 +188,7 @@ class EmailLeadProcessor
         return Str::title($name);
     }
 
-    private function shouldIgnoreEmail(IncomingMail $email): bool
+    private function shouldIgnoreEmail($email): bool
     {
         $ignorePatterns = [
             'noreply',
@@ -198,7 +213,7 @@ class EmailLeadProcessor
         return false;
     }
 
-    private function extractPhoneNumber(IncomingMail $email): ?string
+    private function extractPhoneNumber($email): ?string
     {
         $text = $email->textPlain . ' ' . strip_tags($email->textHtml);
 
@@ -219,15 +234,13 @@ class EmailLeadProcessor
         return null;
     }
 
-    private function extractMessage(IncomingMail $email): string
+    private function extractMessage($email): string
     {
         $message = '';
 
-        // Prefer plain text, fall back to HTML
+        // Our simple object only has textPlain
         if (!empty($email->textPlain)) {
             $message = $email->textPlain;
-        } elseif (!empty($email->textHtml)) {
-            $message = $this->htmlConverter->convert($email->textHtml);
         }
 
         // Add subject if it's informative
@@ -240,7 +253,7 @@ class EmailLeadProcessor
         return Str::limit($message, 1000);
     }
 
-    private function determineLeadSource(IncomingMail $email): string
+    private function determineLeadSource($email): string
     {
         $subject = strtolower($email->subject ?? '');
         $fromEmail = strtolower($email->fromAddress);
@@ -257,7 +270,7 @@ class EmailLeadProcessor
         return 'email';
     }
 
-    private function findClientForEmail(IncomingMail $email): ?Client
+    private function findClientForEmail($email): ?Client
     {
         // Try to match client by sender domain or specific patterns
         $fromEmail = $email->fromAddress;
