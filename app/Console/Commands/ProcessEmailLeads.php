@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Services\EmailLeadProcessor;
 
 class ProcessEmailLeads extends Command
 {
@@ -25,7 +26,7 @@ class ProcessEmailLeads extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         $this->info('Starting email lead processing...');
 
@@ -34,6 +35,8 @@ class ProcessEmailLeads extends Command
         }
 
         try {
+            // Create the processor instance directly
+            $processor = new EmailLeadProcessor();
             $leads = $processor->processNewEmails();
 
             if (empty($leads)) {
@@ -51,6 +54,7 @@ class ProcessEmailLeads extends Command
 
         } catch (\Exception $e) {
             $this->error('Error processing emails: ' . $e->getMessage());
+            $this->error('Stack trace: ' . $e->getTraceAsString());
             return self::FAILURE;
         }
     }
