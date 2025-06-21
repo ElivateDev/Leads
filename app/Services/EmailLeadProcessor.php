@@ -45,24 +45,32 @@ class EmailLeadProcessor
         $processed = [];
 
         try {
+            // Get ALL emails first for debugging
+            $allMailIds = $this->mailbox->searchMailbox('ALL');
+            Log::info('Total emails in inbox: ' . count($allMailIds));
+
             // Get unseen emails
             $mailIds = $this->mailbox->searchMailbox('UNSEEN');
-
             Log::info('Found ' . count($mailIds) . ' unread emails to process');
+
+            // If no unseen emails, let's check the most recent email for debugging
+            if (empty($mailIds) && !empty($allMailIds)) {
+                Log::info('No unseen emails, checking most recent email for debugging');
+                $recentMailId = end($allMailIds);
+                $email = $this->mailbox->getMail($recentMailId);
+                Log::info('Most recent email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
+            }
 
             foreach ($mailIds as $mailId) {
                 try {
                     $email = $this->mailbox->getMail($mailId);
+                    Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
+
                     $lead = $this->processEmail($email);
 
                     if ($lead) {
                         $processed[] = $lead;
-
-                        // Mark email as seen
                         $this->mailbox->markMailAsRead($mailId);
-
-                        // Optionally move to processed folder
-                        // $this->mailbox->moveMail($mailId, 'INBOX.Processed');
                     }
 
                 } catch (\Exception $e) {
@@ -72,10 +80,12 @@ class EmailLeadProcessor
 
         } catch (\Exception $e) {
             Log::error('Error connecting to mailbox: ' . $e->getMessage());
+            throw $e;
         }
 
         return $processed;
     }
+
 
     private function processEmail(IncomingMail $email): ?Lead
     {
