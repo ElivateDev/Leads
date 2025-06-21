@@ -43,7 +43,7 @@ class LeadResource extends Resource
                         'lost' => 'Lost',
                     ])
                     ->default('new'),
-                Forms\Components\TextInput::make('source')
+                Forms\Components\Select::make('source')
                     ->options([
                         'website' => 'Website',
                         'phone' => 'Phone',
