@@ -68,7 +68,7 @@ class LeadResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('phone')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\SelectColumn::make('status')
                     ->options([
                         'new' => 'New',
                         'contacted' => 'Contacted',
@@ -77,7 +77,7 @@ class LeadResource extends Resource
                         'lost' => 'Lost',
                     ])
                     ->sortable(),
-                Tables\Columns\TextColumn::make('source')
+                Tables\Columns\SelectColumn::make('source')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
                         'website' => 'success',
