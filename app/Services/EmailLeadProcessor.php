@@ -249,8 +249,12 @@ class EmailLeadProcessor
             $message = "Subject: {$subject}\n\n" . $message;
         }
 
-        // Limit message length
-        return Str::limit($message, 1000);
+        // Limit message length - use simple substr instead of Str::limit
+        if (strlen($message) > 1000) {
+            $message = substr($message, 0, 1000) . '...';
+        }
+
+        return $message;
     }
 
     private function determineLeadSource($email): string
