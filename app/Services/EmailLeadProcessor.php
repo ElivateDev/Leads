@@ -1,0 +1,285 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Lead;
+use App\Models\Client;
+use PhpImap\Mailbox;
+use PhpImap\IncomingMail;
+use ZBateson\MailMimeParser\Message;
+use ZBateson\MailMimeParser\Header\AddressHeader;
+use League\HTMLToMarkdown\HtmlConverter;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+class EmailLeadProcessor
+{
+    private Mailbox $mailbox;
+    private HtmlConverter $htmlConverter;
+
+    public function __construct()
+    {
+        $config = config('services.imap');
+
+        $connectionString = sprintf(
+            '{%s:%d/imap/%s}%s',
+            $config['host'],
+            $config['port'],
+            $config['encryption'],
+            $config['default_folder']
+        );
+
+        $this->mailbox = new Mailbox(
+            $connectionString,
+            $config['username'],
+            $config['password'],
+            null,
+            'UTF-8'
+        );
+
+        $this->htmlConverter = new HtmlConverter();
+    }
+
+    public function processNewEmails(): array
+    {
+        $processed = [];
+
+        try {
+            // Get unseen emails
+            $mailIds = $this->mailbox->searchMailbox('UNSEEN');
+
+            Log::info('Found ' . count($mailIds) . ' unread emails to process');
+
+            foreach ($mailIds as $mailId) {
+                try {
+                    $email = $this->mailbox->getMail($mailId);
+                    $lead = $this->processEmail($email);
+
+                    if ($lead) {
+                        $processed[] = $lead;
+
+                        // Mark email as seen
+                        $this->mailbox->markMailAsRead($mailId);
+
+                        // Optionally move to processed folder
+                        // $this->mailbox->moveMail($mailId, 'INBOX.Processed');
+                    }
+
+                } catch (\Exception $e) {
+                    Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage());
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error connecting to mailbox: ' . $e->getMessage());
+        }
+
+        return $processed;
+    }
+
+    private function processEmail(IncomingMail $email): ?Lead
+    {
+        // Extract sender information
+        $senderEmail = $email->fromAddress;
+        $senderName = $email->fromName ?: $this->extractNameFromEmail($senderEmail);
+
+        // Skip if no sender email
+        if (!$senderEmail) {
+            Log::warning('Email without sender address, skipping');
+            return null;
+        }
+
+        // Check if this is an automated email we should ignore
+        if ($this->shouldIgnoreEmail($email)) {
+            Log::info('Ignoring automated email from: ' . $senderEmail);
+            return null;
+        }
+
+        // Extract phone number from email content
+        $phoneNumber = $this->extractPhoneNumber($email);
+
+        // Get email content
+        $message = $this->extractMessage($email);
+
+        // Determine lead source
+        $source = $this->determineLeadSource($email);
+
+        // Find or use default client
+        $client = $this->findClientForEmail($email) ?: $this->getDefaultClient();
+
+        if (!$client) {
+            Log::error('No client found and no default client set');
+            return null;
+        }
+
+        // Check if lead already exists
+        if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
+            Log::info('Lead already exists for: ' . $senderEmail);
+            return null;
+        }
+
+        // Create lead with email metadata
+        $lead = Lead::create([
+            'client_id' => $client->id,
+            'name' => $senderName,
+            'email' => $senderEmail,
+            'phone' => $phoneNumber,
+            'message' => $message,
+            'status' => 'new',
+            'source' => $source,
+            'email_subject' => $email->subject,
+            'email_received_at' => $email->date ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
+        ]);
+
+        Log::info('Created new lead from email: ' . $senderEmail);
+
+        return $lead;
+    }
+
+    private function extractNameFromEmail(string $email): string
+    {
+        // Extract name from email address (part before @)
+        $name = explode('@', $email)[0];
+
+        // Replace dots and underscores with spaces, then title case
+        $name = str_replace(['.', '_', '-'], ' ', $name);
+        return Str::title($name);
+    }
+
+    private function shouldIgnoreEmail(IncomingMail $email): bool
+    {
+        $ignorePatterns = [
+            'noreply',
+            'no-reply',
+            'donotreply',
+            'mailer-daemon',
+            'postmaster',
+            'bounces',
+            'notifications',
+        ];
+
+        $fromEmail = strtolower($email->fromAddress);
+        $subject = strtolower($email->subject ?? '');
+
+        foreach ($ignorePatterns as $pattern) {
+            if (Str::contains($fromEmail, $pattern) || Str::contains($subject, $pattern)) {
+                return true;
+            }
+        }
+
+        // Check for auto-reply headers using the correct property
+        $headerInfo = $email->headerInfo;
+        if ($headerInfo) {
+            // Check common auto-reply indicators
+            $autoReplyHeaders = [
+                'auto-submitted',
+                'x-auto-response-suppress',
+                'x-autorespond',
+                'x-autoreply',
+                'precedence'
+            ];
+
+            foreach ($autoReplyHeaders as $header) {
+                if (property_exists($headerInfo, str_replace('-', '_', $header))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function extractPhoneNumber(IncomingMail $email): ?string
+    {
+        $text = $email->textPlain . ' ' . strip_tags($email->textHtml);
+
+        // Common phone number patterns
+        $patterns = [
+            '/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/', // US format
+            '/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/',       // Simple format
+            '/(\+\d{1,3}[-.\s]?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{4})/', // International
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text, $matches)) {
+                // Clean up the phone number
+                return preg_replace('/[^\d+]/', '', $matches[1]);
+            }
+        }
+
+        return null;
+    }
+
+    private function extractMessage(IncomingMail $email): string
+    {
+        $message = '';
+
+        // Prefer plain text, fall back to HTML
+        if (!empty($email->textPlain)) {
+            $message = $email->textPlain;
+        } elseif (!empty($email->textHtml)) {
+            $message = $this->htmlConverter->convert($email->textHtml);
+        }
+
+        // Add subject if it's informative
+        $subject = $email->subject ?? '';
+        if ($subject && !Str::contains(strtolower($subject), ['contact', 'inquiry', 'message'])) {
+            $message = "Subject: {$subject}\n\n" . $message;
+        }
+
+        // Limit message length
+        return Str::limit($message, 1000);
+    }
+
+    private function determineLeadSource(IncomingMail $email): string
+    {
+        $subject = strtolower($email->subject ?? '');
+        $fromEmail = strtolower($email->fromAddress);
+
+        // Check for common form sources
+        if (Str::contains($subject, ['contact form', 'website', 'inquiry'])) {
+            return 'website';
+        }
+
+        if (Str::contains($fromEmail, ['facebook', 'instagram', 'linkedin', 'twitter'])) {
+            return 'social';
+        }
+
+        return 'email';
+    }
+
+    private function findClientForEmail(IncomingMail $email): ?Client
+    {
+        // Try to match client by sender domain or specific patterns
+        $fromEmail = $email->fromAddress;
+        $domain = explode('@', $fromEmail)[1] ?? '';
+
+        // Check if there's a client with this email domain in their company field
+        $client = Client::where('email', 'LIKE', "%@{$domain}")
+            ->orWhere('company', 'LIKE', "%{$domain}%")
+            ->first();
+
+        return $client;
+    }
+
+    private function getDefaultClient(): ?Client
+    {
+        $defaultClientId = env('DEFAULT_CLIENT_ID');
+        return $defaultClientId ? Client::find($defaultClientId) : null;
+    }
+
+    private function leadExists(string $email, ?string $phone, int $clientId): bool
+    {
+        $query = Lead::where('client_id', $clientId);
+
+        if ($phone) {
+            $query->where(function ($q) use ($email, $phone) {
+                $q->where('email', $email)->orWhere('phone', $phone);
+            });
+        } else {
+            $query->where('email', $email);
+        }
+
+        return $query->exists();
+    }
+}

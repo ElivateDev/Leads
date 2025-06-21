@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'imap' => [
+        'host' => env('IMAP_HOST'),
+        'port' => env('IMAP_PORT'),
+        'encryption' => env('IMAP_ENCRYPTION'),
+        'username' => env('IMAP_USERNAME'),
+        'password' => env('IMAP_PASSWORD'),
+        'validate_cert' => env('IMAP_VALIDATE_CERT', true),
+        'default_folder' => env('IMAP_DEFAULT_FOLDER', 'INBOX'),
+    ],
+
 ];
