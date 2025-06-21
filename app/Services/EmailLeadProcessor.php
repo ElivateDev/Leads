@@ -50,35 +50,37 @@ class EmailLeadProcessor
             $allMails = imap_search($imapStream, 'ALL', SE_UID);
             $allMailIds = $allMails ? $allMails : [];
             Log::info('Total emails in inbox: ' . count($allMailIds));
+            echo "Total emails found: " . count($allMailIds) . "\n";
 
             $unseenMails = imap_search($imapStream, 'UNSEEN', SE_UID);
             $mailIds = $unseenMails ? $unseenMails : [];
             Log::info('Found ' . count($mailIds) . ' unread emails to process');
-
-            // If no unseen emails, let's check the most recent email for debugging
-            if (empty($mailIds) && !empty($allMailIds)) {
-                Log::info('No unseen emails, checking most recent email for debugging');
-                $recentMailId = end($allMailIds);
-                $email = $this->mailbox->getMail($recentMailId, false);
-                Log::info('Most recent email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
-            }
+            echo "Unread emails found: " . count($mailIds) . "\n";
 
             foreach ($mailIds as $mailId) {
                 try {
+                    echo "Processing email ID: $mailId\n";
                     $email = $this->mailbox->getMail($mailId, false);
+                    echo "Email from: " . $email->fromAddress . " Subject: " . $email->subject . "\n";
                     Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
 
                     $lead = $this->processEmail($email);
 
                     if ($lead) {
+                        echo "✓ Lead created successfully\n";
                         $processed[] = $lead;
                         $this->mailbox->markMailAsRead($mailId);
+                    } else {
+                        echo "✗ No lead created - check processEmail() method\n";
                     }
 
                 } catch (\Exception $e) {
+                    echo "✗ Error processing email: " . $e->getMessage() . "\n";
                     Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage());
                 }
             }
+
+            echo "Total leads processed: " . count($processed) . "\n";
 
         } catch (\Exception $e) {
             Log::error('Error connecting to mailbox: ' . $e->getMessage());
@@ -88,47 +90,60 @@ class EmailLeadProcessor
         return $processed;
     }
 
-
     private function processEmail(IncomingMail $email): ?Lead
     {
         // Extract sender information
         $senderEmail = $email->fromAddress;
         $senderName = $email->fromName ?: $this->extractNameFromEmail($senderEmail);
 
+        echo "  - Sender: $senderName ($senderEmail)\n";
+
         // Skip if no sender email
         if (!$senderEmail) {
+            echo "  ✗ No sender email, skipping\n";
             Log::warning('Email without sender address, skipping');
             return null;
         }
 
         // Check if this is an automated email we should ignore
         if ($this->shouldIgnoreEmail($email)) {
+            echo "  ✗ Automated email, skipping\n";
             Log::info('Ignoring automated email from: ' . $senderEmail);
             return null;
         }
 
         // Extract phone number from email content
         $phoneNumber = $this->extractPhoneNumber($email);
+        echo "  - Phone extracted: " . ($phoneNumber ?: 'none') . "\n";
 
         // Get email content
         $message = $this->extractMessage($email);
+        echo "  - Message length: " . strlen($message) . " characters\n";
+        echo "  - Message preview: " . substr($message, 0, 100) . "...\n";
 
         // Determine lead source
         $source = $this->determineLeadSource($email);
+        echo "  - Source: $source\n";
 
         // Find or use default client
         $client = $this->findClientForEmail($email) ?: $this->getDefaultClient();
 
         if (!$client) {
+            echo "  ✗ No client found and no default client set\n";
             Log::error('No client found and no default client set');
             return null;
         }
 
+        echo "  - Client: {$client->name} (ID: {$client->id})\n";
+
         // Check if lead already exists
         if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
+            echo "  ✗ Lead already exists\n";
             Log::info('Lead already exists for: ' . $senderEmail);
             return null;
         }
+
+        echo "  ✓ All checks passed, creating lead\n";
 
         // Create lead with email metadata
         $lead = Lead::create([
@@ -179,25 +194,7 @@ class EmailLeadProcessor
             }
         }
 
-        // Check for auto-reply headers using the correct property
-        $headerInfo = $email->headerInfo;
-        if ($headerInfo) {
-            // Check common auto-reply indicators
-            $autoReplyHeaders = [
-                'auto-submitted',
-                'x-auto-response-suppress',
-                'x-autorespond',
-                'x-autoreply',
-                'precedence'
-            ];
-
-            foreach ($autoReplyHeaders as $header) {
-                if (property_exists($headerInfo, str_replace('-', '_', $header))) {
-                    return true;
-                }
-            }
-        }
-
+        // Remove the headerInfo check since it doesn't exist
         return false;
     }
 
