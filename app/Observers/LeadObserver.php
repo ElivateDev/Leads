@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Lead;
+use Illuminate\Support\Facades\Log;
 use App\Notifications\NewLeadNotification;
 
 class LeadObserver
@@ -12,8 +13,15 @@ class LeadObserver
      */
     public function created(Lead $lead): void
     {
+        Log::info('LeadObserver: Lead created, checking if should send notification');
+        Log::info('Client email_notifications: ' . ($lead->client->email_notifications ? 'true' : 'false'));
+
         if ($lead->client->email_notifications) {
+            Log::info('Sending notification to: ' . $lead->client->email);
             $lead->client->notify(new NewLeadNotification($lead));
+            Log::info('Notification sent successfully');
+        } else {
+            Log::info('Notifications disabled for client');
         }
     }
 
