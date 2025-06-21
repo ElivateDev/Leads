@@ -43,25 +43,29 @@ class EmailLeadProcessor
         $processed = [];
 
         try {
-            // Get ALL emails first for debugging
-            $allMailIds = $this->mailbox->searchMailbox('ALL');
+            // Get the raw IMAP stream to avoid encoding issues
+            $imapStream = $this->mailbox->getImapStream();
+
+            // Use native PHP IMAP functions to avoid the encoding issue
+            $allMails = imap_search($imapStream, 'ALL', SE_UID);
+            $allMailIds = $allMails ? $allMails : [];
             Log::info('Total emails in inbox: ' . count($allMailIds));
 
-            // Get unseen emails
-            $mailIds = $this->mailbox->searchMailbox('UNSEEN');
+            $unseenMails = imap_search($imapStream, 'UNSEEN', SE_UID);
+            $mailIds = $unseenMails ? $unseenMails : [];
             Log::info('Found ' . count($mailIds) . ' unread emails to process');
 
             // If no unseen emails, let's check the most recent email for debugging
             if (empty($mailIds) && !empty($allMailIds)) {
                 Log::info('No unseen emails, checking most recent email for debugging');
                 $recentMailId = end($allMailIds);
-                $email = $this->mailbox->getMail($recentMailId);
+                $email = $this->mailbox->getMail($recentMailId, false);
                 Log::info('Most recent email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
             }
 
             foreach ($mailIds as $mailId) {
                 try {
-                    $email = $this->mailbox->getMail($mailId);
+                    $email = $this->mailbox->getMail($mailId, false);
                     Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
 
                     $lead = $this->processEmail($email);
