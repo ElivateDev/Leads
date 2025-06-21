@@ -77,7 +77,7 @@ class LeadResource extends Resource
                         'lost' => 'Lost',
                     ])
                     ->sortable(),
-                Tables\Columns\SelectColumn::make('source')
+                Tables\Columns\TextColumn::make('source')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
                         'website' => 'success',
