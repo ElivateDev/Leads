@@ -22,7 +22,7 @@ class EmailLeadProcessor
         $config = config('services.imap');
 
         $connectionString = sprintf(
-            '{%s:%d/imap/%s}%s',
+            '{%s:%d/imap/%s/novalidate-cert}%s',
             $config['host'],
             $config['port'],
             $config['encryption'],
@@ -32,9 +32,7 @@ class EmailLeadProcessor
         $this->mailbox = new Mailbox(
             $connectionString,
             $config['username'],
-            $config['password'],
-            null,
-            'UTF-8'
+            $config['password']
         );
 
         $this->htmlConverter = new HtmlConverter();
