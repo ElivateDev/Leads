@@ -263,7 +263,7 @@ class EmailLeadProcessor
         $fromEmail = strtolower($email->fromAddress);
 
         // Check for common form sources
-        if (Str::contains($subject, ['contact form', 'website', 'inquiry'])) {
+        if (Str::contains($subject, ['contact form', 'website', 'inquiry', 'message'])) {
             return 'website';
         }
 
@@ -271,7 +271,7 @@ class EmailLeadProcessor
             return 'social';
         }
 
-        return 'email';
+        return 'other';
     }
 
     private function findClientForEmail($email): ?Client
