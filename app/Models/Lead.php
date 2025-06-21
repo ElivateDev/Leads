@@ -16,6 +16,7 @@ class Lead extends Model
         'email',
         'phone',
         'message',
+        'from_email',
         'status',
         'source',
     ];
@@ -34,6 +35,7 @@ class Lead extends Model
             'phone' => 'nullable|string|required_without:email',
             'message' => 'nullable|string',
             'status' => 'required|in:new,contacted,qualified,converted,lost',
+            'from_email' => 'nullable|email',
             'source' => 'required|in:website,phone,referral,social,other',
             'client_id' => 'required|exists:clients,id',
         ];

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Lead;
 use PhpImap\Mailbox;
 use App\Models\Client;
+use App\Models\ClientEmail;
 use Illuminate\Support\Str;
 use TheIconic\NameParser\Parser;
 use Illuminate\Support\Facades\Log;
@@ -168,6 +169,7 @@ class EmailLeadProcessor
             'message' => $message,
             'status' => 'new',
             'source' => $source,
+            'from_email' => $senderEmail,
             'email_subject' => $email->subject,
             'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
         ]);
@@ -307,8 +309,32 @@ class EmailLeadProcessor
     private function findClientForEmail($email): ?Client
     {
         $fromEmail = $email->fromAddress;
+
+        $clientEmail = ClientEmail::where('email', $fromEmail)
+            ->where('is_active', true)
+            ->with('client')
+            ->first();
+
+        if ($clientEmail) {
+            /** @var Client $client */
+            $client = $clientEmail->client;
+            return $client;
+        }
+
         $domain = explode('@', $fromEmail)[1] ?? '';
 
+        $clientEmail = ClientEmail::where('email', 'LIKE', "%@{$domain}")
+            ->where('is_active', true)
+            ->with('client')
+            ->first();
+
+        if ($clientEmail) {
+            /** @var Client $client */
+            $client = $clientEmail->client;
+            return $client;
+        }
+
+        // Original fallback logic
         $client = Client::where('email', 'LIKE', "%@{$domain}")
             ->orWhere('company', 'LIKE', "%{$domain}%")
             ->first();

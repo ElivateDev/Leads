@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->string('email')->nullable();
             $table->string('phone')->nullable();
             $table->text('message')->nullable();
+            $table->string('from_email')->nullable();
             $table->enum('status', ['new', 'contacted', 'qualified', 'converted', 'lost'])
                 ->default('new');
             $table->enum('source', ['website', 'phone', 'referral', 'social', 'other'])

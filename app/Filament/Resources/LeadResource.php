@@ -34,6 +34,10 @@ class LeadResource extends Resource
                     ->tel(),
                 Forms\Components\Textarea::make('message')
                     ->columnSpanFull(),
+                Forms\Components\TextInput::make('from_email')
+                    ->email()
+                    ->label('From Email')
+                    ->helperText('Email address from which the lead was generated'),
                 Forms\Components\Select::make('status')
                     ->options([
                         'new' => 'New',
@@ -68,6 +72,9 @@ class LeadResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('phone')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('from_email')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\SelectColumn::make('status')
                     ->options([
                         'new' => 'New',

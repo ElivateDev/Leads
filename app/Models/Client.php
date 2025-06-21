@@ -27,4 +27,9 @@ class Client extends Model
     {
         return $this->hasMany(Lead::class);
     }
+
+    public function clientEmails(): HasMany
+    {
+        return $this->hasMany(ClientEmail::class);
+    }
 }
