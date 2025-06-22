@@ -27,8 +27,8 @@ A Laravel-based CRM application that automatically processes emails to generate 
 
 -   PHP 8.2 or higher
 -   Composer
--   Node.js & npm
 -   SQLite (or MySQL/PostgreSQL if preferred)
+-   Node.js & npm (optional - only needed for frontend asset compilation)
 
 ### Setup
 
@@ -45,20 +45,14 @@ A Laravel-based CRM application that automatically processes emails to generate 
     composer install
     ```
 
-3. **Install Node.js dependencies**
-
-    ```bash
-    npm install
-    ```
-
-4. **Environment Configuration**
+3. **Environment Configuration**
 
     ```bash
     cp .env.example .env
     php artisan key:generate
     ```
 
-5. **Database Setup**
+4. **Database Setup**
 
     Configure your DB settings in the `.env` file:
 
@@ -75,9 +69,16 @@ A Laravel-based CRM application that automatically processes emails to generate 
     php artisan migrate
     ```
 
-6. **Create Admin User**
+5. **Create Admin User**
+
     ```bash
     php artisan make:filament-user
+    ```
+
+6. **Optional: Install Node.js dependencies (for frontend customization)**
+    ```bash
+    npm install
+    npm run build
     ```
 
 ## Configuration
