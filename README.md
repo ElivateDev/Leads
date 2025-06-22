@@ -35,7 +35,7 @@ A Laravel-based CRM application that automatically processes emails to generate 
 1. **Clone the repository**
 
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/ElivateDev/Leads
     cd Leads
     ```
 
