@@ -27,6 +27,7 @@ beforeEach(function () {
 
     $this->clientEmail = ClientEmail::factory()->create([
         'client_id' => $this->client->id,
+        'rule_type' => 'email_match',
         'email' => 'info@testclient.com',
         'is_active' => true,
     ]);
@@ -62,6 +63,7 @@ test('finds client by exact email match', function () {
 test('finds client by domain match', function () {
     ClientEmail::factory()->create([
         'client_id' => $this->client->id,
+        'rule_type' => 'email_match',
         'email' => '@testclient.com',
         'is_active' => true,
     ]);
@@ -252,4 +254,173 @@ test('falls back to sender email when no email in content', function () {
 
     $email = callPrivateMethod($processor, 'extractEmailAddressFromEmail', $mockEmail);
     expect($email)->toBe('sender@example.com');
+});
+
+test('finds client by custom rule with single condition', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'custom_rule',
+        'custom_conditions' => 'Source: Facebook',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@unmatched-domain.net',
+        'textPlain' => 'This is a lead from Source: Facebook',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->not->toBeNull();
+    expect($client->id)->toBe($this->client->id);
+});
+
+test('finds client by custom rule with AND condition', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'custom_rule',
+        'custom_conditions' => 'Source: Facebook AND rep: henry',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@unmatched-domain.net',
+        'textPlain' => 'This is a lead from Source: Facebook and rep: henry is handling it',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->not->toBeNull();
+    expect($client->id)->toBe($this->client->id);
+});
+
+test('custom rule with AND condition fails if one condition is missing', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'custom_rule',
+        'custom_conditions' => 'Source: Facebook AND rep: henry',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@unmatched-domain.net',
+        'textPlain' => 'This is a lead from Source: Facebook only',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->toBeNull();
+});
+
+test('finds client by custom rule with OR condition', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'custom_rule',
+        'custom_conditions' => 'Source: Facebook OR Source: Google',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@unmatched-domain.net',
+        'textPlain' => 'This is a lead from Source: Google',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->not->toBeNull();
+    expect($client->id)->toBe($this->client->id);
+});
+
+test('finds client by combined rule when both email and custom conditions match', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'combined_rule',
+        'email' => 'leads@facebook.com',
+        'custom_conditions' => 'rep: henry',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@facebook.com',
+        'textPlain' => 'This is a lead for rep: henry',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->not->toBeNull();
+    expect($client->id)->toBe($this->client->id);
+});
+
+test('combined rule fails when email matches but custom conditions do not', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'combined_rule',
+        'email' => 'leads@facebook.com',
+        'custom_conditions' => 'rep: henry',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@facebook.com',
+        'textPlain' => 'This is a lead for rep: jane', // Wrong rep
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->toBeNull();
+});
+
+test('combined rule fails when custom conditions match but email does not', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'combined_rule',
+        'email' => 'leads@facebook.com',
+        'custom_conditions' => 'rep: henry',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'leads@zillow.com', // Wrong email
+        'textPlain' => 'This is a lead for rep: henry',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->toBeNull();
+});
+
+test('combined rule works with domain matching and custom conditions', function () {
+    ClientEmail::factory()->create([
+        'client_id' => $this->client->id,
+        'rule_type' => 'combined_rule',
+        'email' => '@facebook.com',
+        'custom_conditions' => 'property_type: commercial',
+        'is_active' => true,
+    ]);
+
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'fromAddress' => 'noreply@facebook.com', // Domain match
+        'textPlain' => 'This is a commercial lead: property_type: commercial',
+        'subject' => 'New Lead'
+    ];
+
+    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    expect($client)->not->toBeNull();
+    expect($client->id)->toBe($this->client->id);
 });

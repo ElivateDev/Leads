@@ -6,7 +6,10 @@ A Laravel-based CRM application that automatically processes emails to generate 
 
 -   **Automated Email Processing**: Automatically processes incoming emails and converts them into leads
 -   **Client Management**: Manage multiple clients with their contact information and notification preferences
--   **Email Routing**: Map specific email addresses to clients for automatic lead assignment
+-   **Distribution Rules**: Flexible email routing system with three types of rules:
+    -   **Email Match Rules**: Route emails based on sender address or domain
+    -   **Custom Body Text Rules**: Route emails based on content patterns in the email body (e.g., "Source: Facebook AND rep: henry")
+    -   **Combined Rules**: Route emails that match BOTH email pattern AND body text conditions
 -   **Lead Tracking**: Track leads through various stages (new, contacted, qualified, converted, lost)
 -   **Admin Interface**: Modern admin panel built with Filament for easy management
 -   **Notifications**: Automatic email notifications to clients when new leads are received
@@ -142,11 +145,96 @@ Or set up a cron job for automatic processing:
 -   Enable/disable email notifications per client
 -   Manage multiple email addresses per client for lead routing
 
-#### Client Email Mappings
+### Distribution Rules
 
--   Map specific email addresses to clients
--   Set up domain-based routing (e.g., all emails from @domain.com go to Client A)
--   Enable/disable specific email mappings
+The Distribution Rules system allows you to automatically route incoming emails to the correct clients based on the sender's email address, the content of the email body, or both.
+
+#### Email Match Rules
+
+Email Match Rules route emails based on the sender's email address:
+
+1. **Exact Email Match**: Route emails from a specific address
+
+    - Example: `info@client.com` → Routes to Client A
+    - Use case: Direct contact forms or specific email addresses
+
+2. **Domain Match**: Route all emails from a domain
+    - Example: `@client.com` → Routes to Client A
+    - Use case: All emails from a client's organization
+
+#### Custom Body Text Rules
+
+Custom Body Text Rules analyze the email content and route based on patterns:
+
+1. **Single Condition**: Match a single text pattern
+
+    - Example: `Source: Facebook` → Routes Facebook leads
+    - Use case: Lead forms with source identification
+
+2. **AND Conditions**: All conditions must be met
+
+    - Example: `Source: Facebook AND rep: henry` → Routes Facebook leads for Henry
+    - Use case: Specific combinations of criteria
+
+3. **OR Conditions**: Any condition can be met
+    - Example: `Source: Facebook OR Source: Instagram` → Routes social media leads
+    - Use case: Multiple sources going to the same client
+
+#### Combined Rules
+
+Combined Rules require BOTH email pattern AND body text conditions to be met:
+
+1. **Exact Email + Custom Conditions**: Most specific targeting
+
+    - Example: `leads@facebook.com` + `rep: henry` → Only Facebook emails for Henry
+    - Use case: Specific rep handling specific source emails
+
+2. **Domain + Custom Conditions**: Broad email filtering with content specificity
+
+    - Example: `@zillow.com` + `property_type: commercial` → Only Zillow commercial leads
+    - Use case: Platform-specific content filtering
+
+3. **Complex Combinations**: Multiple conditions on both sides
+    - Example: `@realtor.com` + `agent: sarah AND property_type: residential`
+    - Use case: Highly targeted lead routing
+
+#### Creating Distribution Rules
+
+1. Navigate to "Distribution Rules" in the admin panel
+2. Click "Create Distribution Rule"
+3. Select the client to receive matched emails
+4. Choose rule type:
+    - **Email Address Match**: Enter the email address or domain pattern
+    - **Custom Body Text Rule**: Enter the conditions using AND/OR logic
+    - **Combined Rule (Email + Body Text)**: Enter both email pattern AND custom conditions
+5. Add a description to help identify the rule's purpose
+6. Ensure the rule is active
+
+##### Rule Processing Order
+
+Rules are processed in the order they're found in the database. The first matching rule will be used to route the email. More specific rules should generally be created before more general ones.
+
+#### Example Use Cases
+
+1. **Real Estate Agent with Multiple Sources**:
+
+    - `Source: Zillow AND agent: john` → Routes Zillow leads to John
+    - `Source: Realtor.com AND agent: jane` → Routes Realtor.com leads to Jane
+
+2. **Marketing Agency with Campaign Tracking**:
+
+    - `campaign: summer2023 AND product: webdesign` → Routes to Web Design team
+    - `campaign: summer2023 AND product: seo` → Routes to SEO team
+
+3. **Business with Multiple Locations**:
+
+    - `location: downtown` → Routes to Downtown office
+    - `location: suburbs` → Routes to Suburban office
+
+4. **Combined Rule Examples**:
+    - `leads@facebook.com` + `rep: henry` → Only Facebook emails for Henry
+    - `@zillow.com` + `property_type: commercial AND agent: sarah` → Zillow commercial leads for Sarah
+    - `support@company.com` + `priority: high OR urgent: true` → High priority support emails
 
 #### Leads
 

@@ -184,22 +184,18 @@ class EmailLeadProcessor
         $parser = new Parser();
         $text = $email->textPlain;
 
-        // Convert HTML breaks to newlines and strip HTML tags
         $text = str_replace(['<br>', '<br/>', '<br />'], "\n", $text);
         $text = strip_tags($text);
 
-        // Look for name patterns
         if (preg_match('/Name:\s*(.+)/i', $text, $matches)) {
             try {
                 $name = $parser->parse(trim($matches[1]));
                 return $name->getFullName();
             } catch (\Exception $e) {
-                // Fallback to original match if parsing fails
                 return trim($matches[1]);
             }
         }
 
-        // Use fromName if available
         if (!empty($email->fromName)) {
             try {
                 $name = $parser->parse($email->fromName);
@@ -209,7 +205,6 @@ class EmailLeadProcessor
             }
         }
 
-        // Fallback logic...
         return 'Unknown Sender';
     }
 
@@ -308,33 +303,21 @@ class EmailLeadProcessor
 
     private function findClientForEmail($email): ?Client
     {
-        $fromEmail = $email->fromAddress;
-
-        $clientEmail = ClientEmail::where('email', $fromEmail)
-            ->where('is_active', true)
+        $distributionRules = ClientEmail::where('is_active', true)
             ->with('client')
-            ->first();
+            ->get();
 
-        if ($clientEmail) {
-            /** @var Client $client */
-            $client = $clientEmail->client;
-            return $client;
+        foreach ($distributionRules as $rule) {
+            if ($rule->matchesEmail($email)) {
+                /** @var Client $client */
+                $client = $rule->client;
+                return $client;
+            }
         }
 
+        $fromEmail = $email->fromAddress;
         $domain = explode('@', $fromEmail)[1] ?? '';
 
-        $clientEmail = ClientEmail::where('email', 'LIKE', "%@{$domain}")
-            ->where('is_active', true)
-            ->with('client')
-            ->first();
-
-        if ($clientEmail) {
-            /** @var Client $client */
-            $client = $clientEmail->client;
-            return $client;
-        }
-
-        // Original fallback logic
         $client = Client::where('email', 'LIKE', "%@{$domain}")
             ->orWhere('company', 'LIKE', "%{$domain}%")
             ->first();
@@ -365,12 +348,10 @@ class EmailLeadProcessor
 
     private function extractEmailAddressFromEmail($email): string
     {
-        // Try to extract from the body first
         $text = $email->textPlain ?? '';
         if (preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $text, $matches)) {
             return $matches[0];
         }
-        // Fallback to the sender's address
         return $email->fromAddress ?? '';
     }
 }
