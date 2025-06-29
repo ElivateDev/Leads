@@ -37,6 +37,11 @@ class EmailLeadProcessor
         $this->htmlConverter = new HtmlConverter();
     }
 
+    /**
+     * Create leads from emails
+     * @throws \Exception
+     * @return Lead[]
+     */
     public function processNewEmails(): array
     {
         $processed = [];
@@ -105,6 +110,11 @@ class EmailLeadProcessor
         return $processed;
     }
 
+    /**
+     * Create lead from email
+     * @param mixed $email
+     * @return Lead|null
+     */
     private function processEmail($email): ?Lead
     {
         $senderEmail = $email->fromAddress;
@@ -151,6 +161,7 @@ class EmailLeadProcessor
             return null;
         }
 
+        /** @var Client $client */
         echo "  - Client: {$client->name} (ID: {$client->id})\n";
 
         if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
@@ -179,27 +190,28 @@ class EmailLeadProcessor
         return $lead;
     }
 
+    /**
+     * Extract name from email body. Falls back to fromName if not found.
+     * @param mixed $email
+     * @return string
+     */
     private function extractNameFromEmail($email): string
     {
         $parser = new Parser();
         $text = $email->textPlain;
 
-        // Convert HTML breaks to newlines and strip HTML tags
         $text = str_replace(['<br>', '<br/>', '<br />'], "\n", $text);
         $text = strip_tags($text);
 
-        // Look for name patterns
         if (preg_match('/Name:\s*(.+)/i', $text, $matches)) {
             try {
                 $name = $parser->parse(trim($matches[1]));
                 return $name->getFullName();
             } catch (\Exception $e) {
-                // Fallback to original match if parsing fails
                 return trim($matches[1]);
             }
         }
 
-        // Use fromName if available
         if (!empty($email->fromName)) {
             try {
                 $name = $parser->parse($email->fromName);
@@ -209,10 +221,14 @@ class EmailLeadProcessor
             }
         }
 
-        // Fallback logic...
         return 'Unknown Sender';
     }
 
+    /**
+     * Check if the email should be ignored based on common patterns
+     * @param mixed $email
+     * @return bool
+     */
     private function shouldIgnoreEmail($email): bool
     {
         $ignorePatterns = [
@@ -237,6 +253,11 @@ class EmailLeadProcessor
         return false;
     }
 
+    /**
+     * Extract phone number from email body
+     * @param mixed $email
+     * @return string|null
+     */
     private function extractPhoneNumber($email): ?string
     {
         $text = $email->textPlain . ' ' .
@@ -257,6 +278,11 @@ class EmailLeadProcessor
         return null;
     }
 
+    /**
+     * Extract message content from email
+     * @param mixed $email
+     * @return string
+     */
     private function extractMessage($email): string
     {
         $message = '';
@@ -290,6 +316,11 @@ class EmailLeadProcessor
         return $message;
     }
 
+    /**
+     * Determine the lead source based on email content
+     * @param mixed $email
+     * @return string
+     */
     private function determineLeadSource($email): string
     {
         $subject = strtolower($email->subject ?? '');
@@ -306,48 +337,84 @@ class EmailLeadProcessor
         return 'other';
     }
 
+    /**
+     * Find the client associated with the email
+     * @param mixed $email
+     * @return Client|null
+     */
     private function findClientForEmail($email): ?Client
     {
         $fromEmail = $email->fromAddress;
-
-        $clientEmail = ClientEmail::where('email', $fromEmail)
-            ->where('is_active', true)
-            ->with('client')
-            ->first();
-
-        if ($clientEmail) {
-            /** @var Client $client */
-            $client = $clientEmail->client;
-            return $client;
-        }
-
         $domain = explode('@', $fromEmail)[1] ?? '';
 
-        $clientEmail = ClientEmail::where('email', 'LIKE', "%@{$domain}")
-            ->where('is_active', true)
+        // Step 1: Check exact email matches first (fastest)
+        $exactMatch = ClientEmail::where('is_active', true)
+            ->where('email', $fromEmail)
             ->with('client')
             ->first();
 
-        if ($clientEmail) {
+        if ($exactMatch && $exactMatch->matchesEmail($email)) {
             /** @var Client $client */
-            $client = $clientEmail->client;
+            $client = $exactMatch->client;
             return $client;
         }
 
-        // Original fallback logic
-        $client = Client::where('email', 'LIKE', "%@{$domain}")
+        // Step 2: Check domain patterns (still fast with index)
+        $domainMatches = ClientEmail::where('is_active', true)
+            ->whereIn('rule_type', ['email_match', 'combined_rule'])
+            ->where(function ($query) use ($domain) {
+                $query->where('email', "@{$domain}")
+                    ->orWhere('email', 'LIKE', "%@{$domain}");
+            })
+            ->with('client')
+            ->get();
+
+        foreach ($domainMatches as $rule) {
+            if ($rule->matchesEmail($email)) {
+                /** @var Client $client */
+                $client = $rule->client;
+                return $client;
+            }
+        }
+
+        // Step 3: Process custom rules efficiently using lazy collection
+        $foundClient = ClientEmail::where('is_active', true)
+            ->whereIn('rule_type', ['custom_rule', 'combined_rule'])
+            ->with('client')
+            ->lazy(50) // Process 50 at a time
+            ->first(function ($rule) use ($email) {
+                return $rule->matchesEmail($email);
+            });
+
+        if ($foundClient) {
+            /** @var Client $client */
+            $client = $foundClient->client;
+            return $client;
+        }
+
+        // Fallback to client domain matching
+        return Client::where('email', 'LIKE', "%@{$domain}")
             ->orWhere('company', 'LIKE', "%{$domain}%")
             ->first();
-
-        return $client;
     }
 
+    /**
+     * Get the default client if no specific client is found
+     * @return Client|null
+     */
     private function getDefaultClient(): ?Client
     {
         $defaultClientId = env('DEFAULT_CLIENT_ID');
         return $defaultClientId ? Client::find($defaultClientId) : null;
     }
 
+    /**
+     * Check if a lead already exists for the given email and phone
+     * @param string $email
+     * @param string|null $phone
+     * @param int $clientId
+     * @return bool
+     */
     private function leadExists(string $email, ?string $phone, int $clientId): bool
     {
         $query = Lead::where('client_id', $clientId);
@@ -363,14 +430,17 @@ class EmailLeadProcessor
         return $query->exists();
     }
 
+    /**
+     * Extract email address from email content
+     * @param mixed $email
+     * @return string
+     */
     private function extractEmailAddressFromEmail($email): string
     {
-        // Try to extract from the body first
         $text = $email->textPlain ?? '';
         if (preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $text, $matches)) {
             return $matches[0];
         }
-        // Fallback to the sender's address
         return $email->fromAddress ?? '';
     }
 }
