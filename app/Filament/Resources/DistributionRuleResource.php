@@ -45,12 +45,12 @@ class DistributionRuleResource extends Resource
                     ->helperText('Choose how this rule should match incoming emails'),
                 Forms\Components\TextInput::make('email')
                     ->email()
-                    ->visible(fn(Forms\Get $get): bool => in_array($get('rule_type'), ['email_match', 'combined_rule']))
-                    ->required(fn(Forms\Get $get): bool => in_array($get('rule_type'), ['email_match', 'combined_rule']))
+                    ->visible(fn($get) => in_array($get('rule_type'), ['email_match', 'combined_rule']))
+                    ->required(fn($get) => in_array($get('rule_type'), ['email_match', 'combined_rule']))
                     ->helperText('Email address or domain pattern (e.g., info@domain.com or @domain.com)'),
                 Forms\Components\Textarea::make('custom_conditions')
-                    ->visible(fn(Forms\Get $get): bool => in_array($get('rule_type'), ['custom_rule', 'combined_rule']))
-                    ->required(fn(Forms\Get $get): bool => in_array($get('rule_type'), ['custom_rule', 'combined_rule']))
+                    ->visible(fn($get) => in_array($get('rule_type'), ['custom_rule', 'combined_rule']))
+                    ->required(fn($get) => in_array($get('rule_type'), ['custom_rule', 'combined_rule']))
                     ->placeholder('Example: Source: Facebook AND rep: henry')
                     ->helperText('Define conditions using AND/OR logic. Use format "field: value" for each condition.')
                     ->rows(3),
