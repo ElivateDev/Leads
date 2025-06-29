@@ -87,10 +87,6 @@ class ClientEmail extends Model
 
     private function evaluateCondition(string $condition, string $content): bool
     {
-        if (str_contains($condition, ':')) {
-            return str_contains($content, $condition);
-        }
-
         return str_contains($content, $condition);
     }
 
