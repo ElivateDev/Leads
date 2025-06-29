@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use TheIconic\NameParser\Parser;
 use Illuminate\Support\Facades\Log;
 use League\HTMLToMarkdown\HtmlConverter;
+use App\Services\EmailProcessingLogger;
 
 class EmailLeadProcessor
 {
@@ -83,6 +84,17 @@ class EmailLeadProcessor
                     ];
                     imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
 
+                    // Log that we received the email
+                    EmailProcessingLogger::logEmailReceived(
+                        (string) $mailId,
+                        $email->fromAddress,
+                        $email->subject,
+                        [
+                            'from_name' => $email->fromName,
+                            'body_length' => strlen($body),
+                        ]
+                    );
+
                     Log::info('Processing email from: ' . $email->fromAddress . ' Subject: ' . $email->subject);
 
                     $lead = $this->processEmail($email);
@@ -126,18 +138,35 @@ class EmailLeadProcessor
         if (!$leadName) {
             echo "  ✗ No lead name extracted, skipping\n";
             Log::warning('Email without lead name, skipping');
+            EmailProcessingLogger::logError(
+                $senderEmail,
+                'No lead name could be extracted from email',
+                null,
+                ['email_body_preview' => substr($email->textPlain ?? '', 0, 200)]
+            );
             return null;
         }
 
         if (!$senderEmail) {
             echo "  ✗ No sender email, skipping\n";
             Log::warning('Email without sender address, skipping');
+            EmailProcessingLogger::logError(
+                'unknown',
+                'Email without sender address'
+            );
             return null;
         }
 
         if ($this->shouldIgnoreEmail($email)) {
             echo "  ✗ Automated email, skipping\n";
             Log::info('Ignoring automated email from: ' . $senderEmail);
+            EmailProcessingLogger::logEvent(
+                $senderEmail,
+                'email_received',
+                'skipped',
+                'Automated email ignored',
+                ['ignore_reason' => 'Matches automated email patterns']
+            );
             return null;
         }
 
@@ -156,6 +185,15 @@ class EmailLeadProcessor
         if (!$client) {
             echo "  ✗ No client found and no default client set\n";
             Log::error('No client found and no default client set');
+            EmailProcessingLogger::logError(
+                $senderEmail,
+                'No client found and no default client configured',
+                null,
+                [
+                    'sender_domain' => explode('@', $senderEmail)[1] ?? '',
+                    'subject' => $email->subject,
+                ]
+            );
             return null;
         }
 
@@ -165,6 +203,15 @@ class EmailLeadProcessor
         if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
             echo "  ✗ Lead already exists\n";
             Log::info('Lead already exists for: ' . $senderEmail);
+            EmailProcessingLogger::logLeadDuplicate(
+                $senderEmail,
+                $client,
+                'Lead already exists within the last 24 hours',
+                [
+                    'phone_number' => $phoneNumber,
+                    'client_name' => $client->name,
+                ]
+            );
             return null;
         }
 
@@ -182,6 +229,20 @@ class EmailLeadProcessor
             'email_subject' => $email->subject,
             'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
         ]);
+
+        // Log successful lead creation
+        EmailProcessingLogger::logLeadCreated(
+            $senderEmail,
+            $lead,
+            null, // We'll update this when we add rule tracking to findClientForEmail
+            [
+                'extracted_name' => $leadName,
+                'extracted_email' => $leadEmail,
+                'extracted_phone' => $phoneNumber,
+                'message_length' => strlen($message),
+                'source' => $source,
+            ]
+        );
 
         Log::info('Created new lead from email: ' . $senderEmail);
 
@@ -359,6 +420,12 @@ class EmailLeadProcessor
         if ($exactMatch && $exactMatch->matchesEmail($email)) {
             /** @var Client $client */
             $client = $exactMatch->client;
+            EmailProcessingLogger::logRuleMatched(
+                $fromEmail,
+                $exactMatch,
+                $client,
+                ['match_type' => 'exact_email']
+            );
             return $client;
         }
 
@@ -376,7 +443,20 @@ class EmailLeadProcessor
             if ($rule->matchesEmail($email)) {
                 /** @var Client $client */
                 $client = $rule->client;
+                EmailProcessingLogger::logRuleMatched(
+                    $fromEmail,
+                    $rule,
+                    $client,
+                    ['match_type' => 'domain_pattern', 'domain' => $domain]
+                );
                 return $client;
+            } else {
+                EmailProcessingLogger::logRuleFailed(
+                    $fromEmail,
+                    $rule,
+                    'Domain pattern matched but rule conditions failed',
+                    ['domain' => $domain]
+                );
             }
         }
 
@@ -385,8 +465,23 @@ class EmailLeadProcessor
             ->whereIn('rule_type', ['custom_rule', 'combined_rule'])
             ->with('client')
             ->lazy(50) // Process 50 at a time
-            ->first(function ($rule) use ($email) {
-                return $rule->matchesEmail($email);
+            ->first(function ($rule) use ($email, $fromEmail) {
+                $matches = $rule->matchesEmail($email);
+                if ($matches) {
+                    EmailProcessingLogger::logRuleMatched(
+                        $fromEmail,
+                        $rule,
+                        $rule->client,
+                        ['match_type' => 'custom_rule']
+                    );
+                } else {
+                    EmailProcessingLogger::logRuleFailed(
+                        $fromEmail,
+                        $rule,
+                        'Custom rule conditions not met'
+                    );
+                }
+                return $matches;
             });
 
         if ($foundClient) {
