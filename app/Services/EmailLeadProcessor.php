@@ -93,7 +93,6 @@ class EmailLeadProcessor
                     } else {
                         echo "✗ No lead created - check processEmail() method\n";
                     }
-
                 } catch (\Exception $e) {
                     Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage());
                     echo "✗ Error processing email ID $mailId: " . $e->getMessage() . "\n";
@@ -101,7 +100,6 @@ class EmailLeadProcessor
             }
 
             echo "Total leads processed: " . count($processed) . "\n";
-
         } catch (\Exception $e) {
             Log::error('Error connecting to mailbox: ' . $e->getMessage());
             throw $e;
@@ -409,7 +407,7 @@ class EmailLeadProcessor
     }
 
     /**
-     * Check if a lead already exists for the given email and phone
+     * Check if a lead already exists for the given email and phone within the last 24 hours
      * @param string $email
      * @param string|null $phone
      * @param int $clientId
@@ -417,14 +415,15 @@ class EmailLeadProcessor
      */
     private function leadExists(string $email, ?string $phone, int $clientId): bool
     {
-        $query = Lead::where('client_id', $clientId);
+        $query = Lead::where('client_id', $clientId)
+            ->where('created_at', '>=', now()->subHours(24)); // Only check last 24 hours
 
         if ($phone) {
             $query->where(function ($q) use ($email, $phone) {
-                $q->where('email', $email)->orWhere('phone', $phone);
+                $q->where('from_email', $email)->orWhere('phone', $phone);
             });
         } else {
-            $query->where('email', $email);
+            $query->where('from_email', $email);
         }
 
         return $query->exists();
