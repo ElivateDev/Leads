@@ -516,14 +516,14 @@ class EmailLeadProcessor
     private function leadExists(string $email, ?string $phone, int $clientId): bool
     {
         $query = Lead::where('client_id', $clientId)
-            ->where('created_at', '>=', now()->subHours(24)); // Only check last 24 hours
+            ->where('created_at', '>=', now()->subHours(24));
 
         if ($phone) {
             $query->where(function ($q) use ($email, $phone) {
-                $q->where('from_email', $email)->orWhere('phone', $phone);
+                $q->where('email', $email)->orWhere('phone', $phone);
             });
         } else {
-            $query->where('from_email', $email);
+            $query->where('email', $email);
         }
 
         return $query->exists();
