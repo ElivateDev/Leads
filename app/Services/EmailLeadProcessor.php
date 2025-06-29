@@ -198,6 +198,7 @@ class EmailLeadProcessor
         $parser = new Parser();
         $text = $email->textPlain;
 
+        $text = quoted_printable_decode($text);
         $text = str_replace(['<br>', '<br/>', '<br />'], "\n", $text);
         $text = strip_tags($text);
 
@@ -261,6 +262,8 @@ class EmailLeadProcessor
         $text = $email->textPlain . ' ' .
             (isset($email->textHtml) ? strip_tags($email->textHtml) : '');
 
+        $text = quoted_printable_decode($text);
+
         $patterns = [
             '/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/', // US format
             '/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/',       // Simple format
@@ -293,6 +296,8 @@ class EmailLeadProcessor
         if ($subject && !Str::contains(strtolower($subject), ['contact', 'inquiry', 'message'])) {
             $message = "Subject: {$subject}\n\n" . $message;
         }
+
+        $message = quoted_printable_decode($message);
 
         $message = str_replace(['<br>', '<br/>', '<br />'], "\n", $message);
 
@@ -437,6 +442,9 @@ class EmailLeadProcessor
     private function extractEmailAddressFromEmail($email): string
     {
         $text = $email->textPlain ?? '';
+
+        $text = quoted_printable_decode($text);
+
         if (preg_match('/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i', $text, $matches)) {
             return $matches[0];
         }
