@@ -200,20 +200,20 @@ class EmailLeadProcessor
         /** @var Client $client */
         echo "  - Client: {$client->name} (ID: {$client->id})\n";
 
-        if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
-            echo "  ✗ Lead already exists\n";
-            Log::info('Lead already exists for: ' . $senderEmail);
-            EmailProcessingLogger::logLeadDuplicate(
-                $senderEmail,
-                $client,
-                'Lead already exists within the last 24 hours',
-                [
-                    'phone_number' => $phoneNumber,
-                    'client_name' => $client->name,
-                ]
-            );
-            return null;
-        }
+        // if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
+        //     echo "  ✗ Lead already exists\n";
+        //     Log::info('Lead already exists for: ' . $senderEmail);
+        //     EmailProcessingLogger::logLeadDuplicate(
+        //         $senderEmail,
+        //         $client,
+        //         'Lead already exists within the last 24 hours',
+        //         [
+        //             'phone_number' => $phoneNumber,
+        //             'client_name' => $client->name,
+        //         ]
+        //     );
+        //     return null;
+        // }
 
         echo "  ✓ All checks passed, creating lead\n";
 
