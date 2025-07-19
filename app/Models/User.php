@@ -22,6 +22,8 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'client_id',
+        'role',
     ];
 
     /**
@@ -52,6 +54,40 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(\Filament\Panel $panel): bool
     {
-        return true; // Allow all users to access the Filament panel
+        if ($panel->getId() === 'admin') {
+            return $this->role === 'admin';
+        }
+
+        if ($panel->getId() === 'client') {
+            $isClient = $this->role === 'client' && $this->client_id;
+            $isAdmin = $this->role === 'admin' && $this->client_id;
+            return $isClient || $isAdmin;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the client associated with this user
+     */
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Check if user is an admin
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is a client
+     */
+    public function isClient(): bool
+    {
+        return $this->role === 'client';
     }
 }

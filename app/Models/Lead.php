@@ -17,6 +17,8 @@ class Lead extends Model
         'phone',
         'message',
         'from_email',
+        'email_subject',
+        'email_received_at',
         'status',
         'source',
     ];
