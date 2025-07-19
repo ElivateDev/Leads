@@ -208,6 +208,29 @@ test('returns null when no phone number found', function () {
     expect($phone)->toBeNull();
 });
 
+test('extracts phone number from structured email with labeled phone field', function () {
+    $processor = app(EmailLeadProcessor::class);
+
+    $mockEmail = (object) [
+        'textPlain' => 'Name: Greg tracking test
+Email: greg.f@elivate.net
+Phone: 987654321
+Consent: I Consent To Receiving Appointment-Related Communications From Alta Sky Dental & Orthodontics, Through The Provided Channels.
+source: Facebook campaign 1
+
+Date: July 18, 2025
+Time: 10:59 pm
+Page URL: https://skydentalaz.com/special-offer/?gtm_debug=1752879547874
+User Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36
+Remote IP: 116.71.161.174
+Powered by: Elementor',
+        'textHtml' => null
+    ];
+
+    $phone = callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
+    expect($phone)->toBe('987654321');
+});
+
 test('determines lead source from email content', function () {
     $processor = app(EmailLeadProcessor::class);
 

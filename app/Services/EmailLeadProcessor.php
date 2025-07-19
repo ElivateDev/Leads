@@ -325,19 +325,66 @@ class EmailLeadProcessor
 
         $text = quoted_printable_decode($text);
 
+        // First, look for explicitly labeled phone numbers
+        $labeledPatterns = [
+            '/Phone:\s*([+]?[\d\s\-\(\)\.]{7,20})/i',
+            '/Phone Number:\s*([+]?[\d\s\-\(\)\.]{7,20})/i',
+            '/Mobile:\s*([+]?[\d\s\-\(\)\.]{7,20})/i',
+            '/Contact:\s*([+]?[\d\s\-\(\)\.]{7,20})/i',
+            '/Tel:\s*([+]?[\d\s\-\(\)\.]{7,20})/i',
+        ];
+
+        foreach ($labeledPatterns as $pattern) {
+            if (preg_match($pattern, $text, $matches)) {
+                $phone = preg_replace('/[^\d+]/', '', $matches[1]);
+                // Ensure it's a reasonable phone number length (7-15 digits)
+                if (strlen($phone) >= 7 && strlen($phone) <= 15) {
+                    return $phone;
+                }
+            }
+        }
+
+        // Remove URLs from text to avoid extracting timestamps and other numeric data
+        $textWithoutUrls = preg_replace('/https?:\/\/[^\s]+/i', '', $text);
+        $textWithoutUrls = preg_replace('/www\.[^\s]+/i', '', $textWithoutUrls);
+
+        // Then try general phone number patterns on URL-free text
         $patterns = [
-            '/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/', // US format
-            '/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/',       // Simple format
+            '/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/', // US format (10 digits)
             '/(\+\d{1,3}[-.\s]?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{4})/', // International
         ];
 
         foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $text, $matches)) {
-                return preg_replace('/[^\d+]/', '', $matches[1]);
+            if (preg_match($pattern, $textWithoutUrls, $matches)) {
+                $phone = preg_replace('/[^\d+]/', '', $matches[1]);
+                // Ensure it's a reasonable phone number length and not a timestamp
+                if (strlen($phone) >= 7 && strlen($phone) <= 15 && !$this->looksLikeTimestamp($phone)) {
+                    return $phone;
+                }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Check if a number looks like a timestamp (too long and recent)
+     * @param string $number
+     * @return bool
+     */
+    private function looksLikeTimestamp(string $number): bool
+    {
+        // Timestamps are typically 10+ digits and represent recent dates
+        if (strlen($number) >= 10) {
+            $timestamp = (int) substr($number, 0, 10);
+            // Check if it's a timestamp from the last 20 years or next 5 years
+            $twentyYearsAgo = strtotime('2005-01-01');
+            $fiveYearsFromNow = strtotime('+5 years');
+
+            return $timestamp >= $twentyYearsAgo && $timestamp <= $fiveYearsFromNow;
+        }
+
+        return false;
     }
 
     /**
