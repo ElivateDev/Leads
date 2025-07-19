@@ -48,7 +48,7 @@ class TestEmailConnection extends Command
 
             if ($result['connection_successful']) {
                 $this->info('✓ Email server connection successful!');
-                
+
                 $this->info('Server Information:');
                 $this->table(['Metric', 'Value'], [
                     ['Total Messages', $result['server_info']['messages'] ?? 'Unknown'],
@@ -83,7 +83,6 @@ class TestEmailConnection extends Command
                     $this->line('4. Test by manually sending an email to your inbox');
                     $this->line('5. Check your website\'s mail logs for send failures');
                 }
-
             } else {
                 $this->error('✗ Email server connection failed!');
                 $this->error('Error: ' . $result['error']);
@@ -91,7 +90,6 @@ class TestEmailConnection extends Command
             }
 
             return self::SUCCESS;
-
         } catch (\Exception $e) {
             $this->error('Exception occurred while testing connection: ' . $e->getMessage());
             Log::error('Email connection test failed', [

@@ -49,12 +49,12 @@ class ProcessEmailLeads extends Command
         if ($this->option('test-connection')) {
             $this->info('Testing email connection first...');
             $testResult = $this->processor->testEmailConnection();
-            
+
             if (!$testResult['connection_successful']) {
                 $this->error('Email connection test failed: ' . $testResult['error']);
                 return self::FAILURE;
             }
-            
+
             $this->info('✓ Email connection test successful');
             $this->info("Total emails in inbox: {$testResult['total_emails']}, Unread: {$testResult['unread_emails']}");
         }
@@ -64,7 +64,7 @@ class ProcessEmailLeads extends Command
 
             if (empty($leads)) {
                 $this->info('No new leads found in email inbox.');
-                
+
                 if ($this->option('debug')) {
                     $this->info('This could mean:');
                     $this->line('- No new emails have arrived');
@@ -72,7 +72,7 @@ class ProcessEmailLeads extends Command
                     $this->line('- All emails were marked as automated and ignored');
                     $this->line('Run with --test-connection to see inbox status');
                 }
-                
+
                 return self::SUCCESS;
             }
 
@@ -83,14 +83,13 @@ class ProcessEmailLeads extends Command
             }
 
             return self::SUCCESS;
-
         } catch (\Exception $e) {
             $this->error('Error processing emails: ' . $e->getMessage());
-            
+
             if ($this->option('debug')) {
                 $this->error('Stack trace: ' . $e->getTraceAsString());
             }
-            
+
             return self::FAILURE;
         }
     }

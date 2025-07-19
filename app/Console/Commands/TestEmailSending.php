@@ -89,7 +89,6 @@ class TestEmailSending extends Command
             $this->info("Test emails sent to: {$recipient}");
 
             return self::SUCCESS;
-
         } catch (\Exception $e) {
             $this->error('Test failed with exception: ' . $e->getMessage());
             Log::error('Email sending test failed', [
@@ -134,7 +133,6 @@ class TestEmailSending extends Command
             $transport->stop();
 
             return ['success' => true];
-
         } catch (\Exception $e) {
             Log::error('SMTP connection test failed', [
                 'error' => $e->getMessage(),
@@ -166,7 +164,6 @@ class TestEmailSending extends Command
             Log::info('Raw email sent successfully', ['recipient' => $recipient]);
 
             return ['success' => true];
-
         } catch (\Exception $e) {
             Log::error('Raw email sending failed', [
                 'error' => $e->getMessage(),
@@ -223,7 +220,6 @@ class TestEmailSending extends Command
             );
 
             return ['success' => true];
-
         } catch (\Exception $e) {
             Log::error('Notification sending failed', [
                 'error' => $e->getMessage(),

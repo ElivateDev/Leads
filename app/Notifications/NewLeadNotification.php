@@ -14,8 +14,7 @@ class NewLeadNotification extends Notification implements ShouldQueue
 
     public function __construct(
         public Lead $lead
-    ) {
-    }
+    ) {}
 
     public function via(object $notifiable): array
     {
@@ -36,7 +35,7 @@ class NewLeadNotification extends Notification implements ShouldQueue
             ->when($this->lead->message, function ($message) {
                 return $message->line('Message: ' . $this->lead->message);
             })
-            ->action('View Lead in CRM', url('/admin/leads/' . $this->lead->id . '/edit'))
+            ->action('View Lead in Client Portal', url('/client/leads/' . $this->lead->id))
             ->line('Thank you for using Elivate CRM!');
     }
 }

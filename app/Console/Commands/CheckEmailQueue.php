@@ -92,7 +92,6 @@ class CheckEmailQueue extends Command
             }
 
             $this->info('');
-
         } catch (\Exception $e) {
             $this->error('Error checking queue status: ' . $e->getMessage());
         }
@@ -101,7 +100,7 @@ class CheckEmailQueue extends Command
     private function checkRecentEmailActivity(): void
     {
         $this->info('Recent Email Activity:');
-        
+
         $hoursBack = $this->option('recent') ? 24 : 168; // 24 hours or 7 days
         $timeframe = now()->subHours($hoursBack);
 
@@ -173,7 +172,7 @@ class CheckEmailQueue extends Command
                 $this->info("Job ID: {$job->id}");
                 $this->info("Queue: {$job->queue}");
                 $this->info("Failed At: {$job->failed_at}");
-                
+
                 // Try to extract useful info from payload
                 $payload = json_decode($job->payload, true);
                 if ($payload && isset($payload['displayName'])) {
@@ -185,7 +184,6 @@ class CheckEmailQueue extends Command
                 $this->error("Exception: {$exception}");
                 $this->info('---');
             }
-
         } catch (\Exception $e) {
             $this->error('Error checking failed jobs: ' . $e->getMessage());
         }

@@ -450,9 +450,9 @@ test('combined rule works with domain matching and custom conditions', function 
 
 test('can test email connection without throwing exceptions', function () {
     $processor = app(EmailLeadProcessor::class);
-    
+
     $result = $processor->testEmailConnection();
-    
+
     expect($result)->toBeArray();
     expect($result)->toHaveKeys(['connection_successful', 'error', 'total_emails', 'unread_emails', 'recent_emails', 'server_info']);
     expect($result['connection_successful'])->toBeBool();
