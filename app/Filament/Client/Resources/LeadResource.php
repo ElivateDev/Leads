@@ -194,8 +194,7 @@ class LeadResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->icon('heroicon-m-eye'),
                 Tables\Actions\EditAction::make()
-                    ->icon('heroicon-m-pencil-square')
-                    ->visible(fn() => Filament::auth()->user()->isClient()),
+                    ->icon('heroicon-m-pencil-square'),
                 Tables\Actions\Action::make('call')
                     ->icon('heroicon-m-phone')
                     ->color('info')
