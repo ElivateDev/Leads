@@ -32,6 +32,24 @@ class LeadObserver
                     'smtp_port' => config('mail.mailers.smtp.port'),
                     'smtp_username' => config('mail.mailers.smtp.username'),
                     'mail_from_address' => config('mail.from.address'),
+                    'mail_from_name' => config('mail.from.name'),
+                    'mail_driver' => config('mail.default'),
+                    'queue_driver' => config('queue.default'),
+                ]);
+
+                // Validate recipient email before sending
+                if (!filter_var($lead->client->email, FILTER_VALIDATE_EMAIL)) {
+                    throw new \InvalidArgumentException('Invalid recipient email address: ' . $lead->client->email);
+                }
+
+                // Log pre-send details
+                Log::info('About to send notification', [
+                    'notification_class' => NewLeadNotification::class,
+                    'lead_id' => $lead->id,
+                    'lead_name' => $lead->name,
+                    'client_id' => $lead->client_id,
+                    'client_name' => $lead->client->name,
+                    'validated_email' => $lead->client->email,
                 ]);
 
                 // Send the notification
@@ -40,6 +58,8 @@ class LeadObserver
                 Log::info('Email notification sent successfully', [
                     'recipient' => $lead->client->email,
                     'notification_class' => NewLeadNotification::class,
+                    'lead_id' => $lead->id,
+                    'delivery_timestamp' => now()->toISOString(),
                 ]);
 
                 // Log successful notification in our tracking system
@@ -54,21 +74,39 @@ class LeadObserver
                         'lead_name' => $lead->name,
                         'smtp_host' => config('mail.mailers.smtp.host'),
                         'delivery_status' => 'sent_successfully',
+                        'delivery_timestamp' => now()->toISOString(),
                     ]
                 );
             } catch (\Symfony\Component\Mailer\Exception\TransportException $e) {
-                Log::error('SMTP Transport Error', [
+                Log::error('SMTP Transport Error - Email delivery failed', [
+                    'error_type' => 'smtp_transport_error',
                     'error' => $e->getMessage(),
                     'code' => $e->getCode(),
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                     'recipient' => $lead->client->email,
+                    'lead_id' => $lead->id,
                     'smtp_config' => [
                         'host' => config('mail.mailers.smtp.host'),
                         'port' => config('mail.mailers.smtp.port'),
                         'username' => config('mail.mailers.smtp.username'),
+                        'encryption' => config('mail.mailers.smtp.encryption'),
                         'timeout' => config('mail.mailers.smtp.timeout'),
+                        'local_domain' => config('mail.mailers.smtp.local_domain'),
                     ],
+                    'mail_config' => [
+                        'from_address' => config('mail.from.address'),
+                        'from_name' => config('mail.from.name'),
+                        'driver' => config('mail.default'),
+                    ],
+                    'troubleshooting_tips' => [
+                        'Check SMTP credentials are correct',
+                        'Verify SMTP host and port are accessible',
+                        'Check firewall/network connectivity',
+                        'Verify from address is authorized to send',
+                        'Check SMTP server logs for rejection reasons',
+                        'Test with telnet: telnet ' . config('mail.mailers.smtp.host') . ' ' . config('mail.mailers.smtp.port')
+                    ]
                 ]);
 
                 EmailProcessingLogger::logError(
@@ -79,6 +117,8 @@ class LeadObserver
                         'error_type' => 'smtp_transport_error',
                         'recipient_email' => $lead->client->email,
                         'smtp_host' => config('mail.mailers.smtp.host'),
+                        'smtp_port' => config('mail.mailers.smtp.port'),
+                        'lead_id' => $lead->id,
                     ]
                 );
             } catch (\Symfony\Component\Mime\Exception\RfcComplianceException $e) {

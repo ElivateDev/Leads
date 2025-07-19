@@ -56,33 +56,83 @@ class EmailLeadProcessor
                 $config['encryption'],
                 $config['default_folder']
             );
+            
+            Log::info('Attempting IMAP connection', [
+                'host' => $config['host'],
+                'port' => $config['port'],
+                'encryption' => $config['encryption'],
+                'username' => $config['username'],
+                'folder' => $config['default_folder']
+            ]);
+            
             $imapConnection = imap_open(
                 $connectionString,
                 $config['username'],
                 $config['password']
             );
             if (!$imapConnection) {
-                throw new \Exception('Could not connect to IMAP: ' . imap_last_error());
+                $imapError = imap_last_error();
+                Log::error('IMAP connection failed', [
+                    'error' => $imapError,
+                    'connection_string' => $connectionString
+                ]);
+                throw new \Exception('Could not connect to IMAP: ' . $imapError);
             }
+            
+            Log::info('IMAP connection successful');
+            
+            // Get all emails (not just unseen) for debugging
+            $allMails = imap_search($imapConnection, 'ALL', SE_UID);
             $unseenMails = imap_search($imapConnection, 'UNSEEN', SE_UID);
             $mailIds = $unseenMails ? $unseenMails : [];
-            Log::info('Found ' . count($mailIds) . ' unread emails to process');
+            
+            Log::info('Email inbox status', [
+                'total_emails' => $allMails ? count($allMails) : 0,
+                'unread_emails' => count($mailIds),
+                'last_5_all_mail_ids' => $allMails ? array_slice($allMails, -5) : [],
+                'unread_mail_ids' => $mailIds
+            ]);
+            
+            echo "Total emails in inbox: " . ($allMails ? count($allMails) : 0) . "\n";
             echo "Unread emails found: " . count($mailIds) . "\n";
 
             foreach ($mailIds as $mailId) {
                 try {
                     echo "Processing email ID: $mailId\n";
+                    Log::info('Processing email', ['mail_id' => $mailId]);
 
                     $header = imap_headerinfo($imapConnection, $mailId);
+                    if (!$header) {
+                        Log::warning('Failed to get header info for email', ['mail_id' => $mailId]);
+                        continue;
+                    }
+                    
                     $body = imap_body($imapConnection, $mailId);
+                    if ($body === false) {
+                        Log::warning('Failed to get body for email', ['mail_id' => $mailId]);
+                        $body = '';
+                    }
+
+                    $fromAddress = isset($header->from[0]) 
+                        ? $header->from[0]->mailbox . '@' . $header->from[0]->host 
+                        : 'unknown@unknown.com';
+                        
+                    $fromName = isset($header->from[0]->personal) ? $header->from[0]->personal : '';
+                    $subject = isset($header->subject) ? $header->subject : '';
 
                     $email = (object) [
-                        'fromAddress' => $header->from[0]->mailbox . '@' . $header->from[0]->host,
-                        'fromName' => $header->from[0]->personal ?? '',
-                        'subject' => $header->subject ?? '',
+                        'fromAddress' => $fromAddress,
+                        'fromName' => $fromName,
+                        'subject' => $subject,
                         'textPlain' => $body,
+                        'date' => isset($header->date) ? $header->date : null,
                     ];
-                    imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
+                    
+                    // Mark as seen
+                    $markResult = imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
+                    if (!$markResult) {
+                        Log::warning('Failed to mark email as seen', ['mail_id' => $mailId]);
+                    }
 
                     // Log that we received the email
                     EmailProcessingLogger::logEmailReceived(
@@ -92,6 +142,7 @@ class EmailLeadProcessor
                         [
                             'from_name' => $email->fromName,
                             'body_length' => strlen($body),
+                            'date' => $email->date,
                         ]
                     );
 
@@ -104,20 +155,130 @@ class EmailLeadProcessor
                         $processed[] = $lead;
                     } else {
                         echo "✗ No lead created - check processEmail() method\n";
+                        Log::warning('No lead created from email', [
+                            'mail_id' => $mailId,
+                            'from_address' => $email->fromAddress,
+                            'subject' => $email->subject
+                        ]);
                     }
                 } catch (\Exception $e) {
-                    Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage());
+                    Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage(), [
+                        'mail_id' => $mailId,
+                        'exception' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
                     echo "✗ Error processing email ID $mailId: " . $e->getMessage() . "\n";
                 }
             }
 
             echo "Total leads processed: " . count($processed) . "\n";
+            
+            // Close IMAP connection
+            if ($imapConnection) {
+                imap_close($imapConnection);
+                Log::info('IMAP connection closed successfully');
+            }
+            
         } catch (\Exception $e) {
-            Log::error('Error connecting to mailbox: ' . $e->getMessage());
+            Log::error('Error connecting to mailbox: ' . $e->getMessage(), [
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             throw $e;
         }
 
         return $processed;
+    }
+
+    /**
+     * Test email server connectivity and get detailed status
+     * @return array
+     */
+    public function testEmailConnection(): array
+    {
+        $result = [
+            'connection_successful' => false,
+            'error' => null,
+            'total_emails' => 0,
+            'unread_emails' => 0,
+            'recent_emails' => [],
+            'server_info' => []
+        ];
+
+        try {
+            $config = config('services.imap');
+            $connectionString = sprintf(
+                '{%s:%d/imap/%s/novalidate-cert}%s',
+                $config['host'],
+                $config['port'],
+                $config['encryption'],
+                $config['default_folder']
+            );
+
+            Log::info('Testing IMAP connection', [
+                'host' => $config['host'],
+                'port' => $config['port'],
+                'username' => $config['username']
+            ]);
+
+            $imapConnection = imap_open(
+                $connectionString,
+                $config['username'],
+                $config['password']
+            );
+
+            if (!$imapConnection) {
+                $result['error'] = imap_last_error();
+                Log::error('IMAP test connection failed', ['error' => $result['error']]);
+                return $result;
+            }
+
+            $result['connection_successful'] = true;
+
+            // Get email counts
+            $mailbox_info = imap_status($imapConnection, $connectionString, SA_ALL);
+            if ($mailbox_info) {
+                $result['server_info'] = [
+                    'messages' => $mailbox_info->messages,
+                    'recent' => $mailbox_info->recent,
+                    'unseen' => $mailbox_info->unseen,
+                    'uidnext' => $mailbox_info->uidnext,
+                ];
+                $result['total_emails'] = $mailbox_info->messages;
+                $result['unread_emails'] = $mailbox_info->unseen;
+            }
+
+            // Get recent emails for debugging
+            $recentMails = imap_search($imapConnection, 'SINCE "' . date('d-M-Y', strtotime('-7 days')) . '"', SE_UID);
+            if ($recentMails) {
+                $recentEmails = [];
+                foreach (array_slice($recentMails, -10) as $mailId) {
+                    $header = imap_headerinfo($imapConnection, $mailId);
+                    if ($header) {
+                        $recentEmails[] = [
+                            'id' => $mailId,
+                            'from' => isset($header->from[0]) ? $header->from[0]->mailbox . '@' . $header->from[0]->host : 'unknown',
+                            'subject' => $header->subject ?? 'No subject',
+                            'date' => $header->date ?? 'No date',
+                            'seen' => $header->Unseen === 'U' ? false : true
+                        ];
+                    }
+                }
+                $result['recent_emails'] = $recentEmails;
+            }
+
+            imap_close($imapConnection);
+            Log::info('IMAP test connection successful', $result['server_info']);
+
+        } catch (\Exception $e) {
+            $result['error'] = $e->getMessage();
+            Log::error('IMAP test connection exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+
+        return $result;
     }
 
     /**

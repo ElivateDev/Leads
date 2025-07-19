@@ -13,7 +13,9 @@ class ProcessEmailLeads extends Command
      * @var string
      */
     protected $signature = 'leads:process-emails
-                          {--limit=50 : Maximum number of emails to process}';
+                          {--limit=50 : Maximum number of emails to process}
+                          {--debug : Show detailed processing information}
+                          {--test-connection : Test email connection before processing}';
 
     /**
      * The console command description.
@@ -43,11 +45,34 @@ class ProcessEmailLeads extends Command
     {
         $this->info('Starting email lead processing...');
 
+        // Test connection first if requested
+        if ($this->option('test-connection')) {
+            $this->info('Testing email connection first...');
+            $testResult = $this->processor->testEmailConnection();
+            
+            if (!$testResult['connection_successful']) {
+                $this->error('Email connection test failed: ' . $testResult['error']);
+                return self::FAILURE;
+            }
+            
+            $this->info('✓ Email connection test successful');
+            $this->info("Total emails in inbox: {$testResult['total_emails']}, Unread: {$testResult['unread_emails']}");
+        }
+
         try {
             $leads = $this->processor->processNewEmails();
 
             if (empty($leads)) {
                 $this->info('No new leads found in email inbox.');
+                
+                if ($this->option('debug')) {
+                    $this->info('This could mean:');
+                    $this->line('- No new emails have arrived');
+                    $this->line('- Emails arrived but failed validation/processing');
+                    $this->line('- All emails were marked as automated and ignored');
+                    $this->line('Run with --test-connection to see inbox status');
+                }
+                
                 return self::SUCCESS;
             }
 
@@ -61,7 +86,11 @@ class ProcessEmailLeads extends Command
 
         } catch (\Exception $e) {
             $this->error('Error processing emails: ' . $e->getMessage());
-            $this->error('Stack trace: ' . $e->getTraceAsString());
+            
+            if ($this->option('debug')) {
+                $this->error('Stack trace: ' . $e->getTraceAsString());
+            }
+            
             return self::FAILURE;
         }
     }
