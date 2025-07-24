@@ -26,8 +26,20 @@ class LeadObserver
 
         if ($lead->client->email_notifications) {
             try {
+                // Get all notification emails for this client
+                $notificationEmails = $lead->client->getNotificationEmails();
+                
+                if (empty($notificationEmails)) {
+                    Log::warning('No notification emails configured for client', [
+                        'client_id' => $lead->client_id,
+                        'client_name' => $lead->client->name,
+                    ]);
+                    return;
+                }
+
                 Log::info('Starting email notification process', [
-                    'recipient_email' => $lead->client->email,
+                    'notification_emails' => $notificationEmails,
+                    'total_recipients' => count($notificationEmails),
                     'smtp_host' => config('mail.mailers.smtp.host'),
                     'smtp_port' => config('mail.mailers.smtp.port'),
                     'smtp_username' => config('mail.mailers.smtp.username'),
@@ -37,46 +49,82 @@ class LeadObserver
                     'queue_driver' => config('queue.default'),
                 ]);
 
-                // Validate recipient email before sending
-                if (!filter_var($lead->client->email, FILTER_VALIDATE_EMAIL)) {
-                    throw new \InvalidArgumentException('Invalid recipient email address: ' . $lead->client->email);
+                $successfulSends = [];
+                $failedSends = [];
+
+                foreach ($notificationEmails as $email) {
+                    try {
+                        // Validate recipient email before sending
+                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            Log::warning('Invalid notification email address skipped', [
+                                'invalid_email' => $email,
+                                'client_id' => $lead->client_id,
+                            ]);
+                            $failedSends[] = ['email' => $email, 'reason' => 'Invalid email format'];
+                            continue;
+                        }
+
+                        // Log pre-send details
+                        Log::info('About to send notification', [
+                            'notification_class' => NewLeadNotification::class,
+                            'lead_id' => $lead->id,
+                            'lead_name' => $lead->name,
+                            'client_id' => $lead->client_id,
+                            'client_name' => $lead->client->name,
+                            'recipient_email' => $email,
+                        ]);
+
+                        // Create a temporary user object for this email
+                        $tempClient = clone $lead->client;
+                        $tempClient->email = $email;
+
+                        // Send the notification
+                        $tempClient->notify(new NewLeadNotification($lead));
+
+                        Log::info('Email notification sent successfully', [
+                            'recipient' => $email,
+                            'notification_class' => NewLeadNotification::class,
+                            'lead_id' => $lead->id,
+                            'delivery_timestamp' => now()->toISOString(),
+                        ]);
+
+                        $successfulSends[] = $email;
+
+                        // Log successful notification in our tracking system
+                        EmailProcessingLogger::logNotificationSent(
+                            $lead->from_email ?? $lead->email ?? 'unknown',
+                            'NewLeadNotification',
+                            $lead,
+                            $lead->client,
+                            [
+                                'notification_class' => NewLeadNotification::class,
+                                'recipient_email' => $email,
+                                'lead_name' => $lead->name,
+                                'smtp_host' => config('mail.mailers.smtp.host'),
+                                'delivery_status' => 'sent_successfully',
+                                'delivery_timestamp' => now()->toISOString(),
+                            ]
+                        );
+                    } catch (\Exception $individualEmailException) {
+                        Log::error('Failed to send notification to individual email', [
+                            'recipient_email' => $email,
+                            'error' => $individualEmailException->getMessage(),
+                            'lead_id' => $lead->id,
+                            'client_id' => $lead->client_id,
+                        ]);
+                        $failedSends[] = ['email' => $email, 'reason' => $individualEmailException->getMessage()];
+                    }
                 }
 
-                // Log pre-send details
-                Log::info('About to send notification', [
-                    'notification_class' => NewLeadNotification::class,
+                // Log summary
+                Log::info('Email notification summary', [
+                    'successful_sends' => count($successfulSends),
+                    'failed_sends' => count($failedSends),
+                    'successful_emails' => $successfulSends,
+                    'failed_emails' => $failedSends,
                     'lead_id' => $lead->id,
-                    'lead_name' => $lead->name,
                     'client_id' => $lead->client_id,
-                    'client_name' => $lead->client->name,
-                    'validated_email' => $lead->client->email,
                 ]);
-
-                // Send the notification
-                $lead->client->notify(new NewLeadNotification($lead));
-
-                Log::info('Email notification sent successfully', [
-                    'recipient' => $lead->client->email,
-                    'notification_class' => NewLeadNotification::class,
-                    'lead_id' => $lead->id,
-                    'delivery_timestamp' => now()->toISOString(),
-                ]);
-
-                // Log successful notification in our tracking system
-                EmailProcessingLogger::logNotificationSent(
-                    $lead->from_email ?? $lead->email ?? 'unknown',
-                    'NewLeadNotification',
-                    $lead,
-                    $lead->client,
-                    [
-                        'notification_class' => NewLeadNotification::class,
-                        'recipient_email' => $lead->client->email,
-                        'lead_name' => $lead->name,
-                        'smtp_host' => config('mail.mailers.smtp.host'),
-                        'delivery_status' => 'sent_successfully',
-                        'delivery_timestamp' => now()->toISOString(),
-                    ]
-                );
             } catch (\Symfony\Component\Mailer\Exception\TransportException $e) {
                 Log::error('SMTP Transport Error - Email delivery failed', [
                     'error_type' => 'smtp_transport_error',

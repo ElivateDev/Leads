@@ -17,11 +17,13 @@ class Client extends Model
         'phone',
         'company',
         'email_notifications',
+        'notification_emails',
         'lead_dispositions',
     ];
 
     protected $casts = [
         'email_notifications' => 'boolean',
+        'notification_emails' => 'array',
         'lead_dispositions' => 'array',
     ];
 
@@ -63,6 +65,34 @@ class Client extends Model
     public function setLeadDispositions(array $dispositions): void
     {
         $this->lead_dispositions = $dispositions;
+        $this->save();
+    }
+
+    /**
+     * Get the client's notification emails or fall back to primary email
+     */
+    public function getNotificationEmails(): array
+    {
+        // If notification_emails is set and not empty, use it
+        if (!empty($this->notification_emails)) {
+            return $this->notification_emails;
+        }
+        
+        // Otherwise, fall back to the primary email
+        return $this->email ? [$this->email] : [];
+    }
+
+    /**
+     * Set the client's notification emails
+     */
+    public function setNotificationEmails(array $emails): void
+    {
+        // Filter out empty emails and reindex array
+        $filtered = array_values(array_filter($emails, function ($email) {
+            return !empty(trim($email));
+        }));
+        
+        $this->notification_emails = empty($filtered) ? null : $filtered;
         $this->save();
     }
 }
