@@ -36,6 +36,13 @@ class ClientResource extends Resource
                 Forms\Components\TextInput::make('company'),
                 Forms\Components\Toggle::make('email_notifications')
                     ->required(),
+                Forms\Components\KeyValue::make('lead_dispositions')
+                    ->label('Lead Dispositions')
+                    ->helperText('Define custom lead statuses for this client. Key is the value stored in database, Value is the display name.')
+                    ->keyLabel('Status Value')
+                    ->valueLabel('Display Name')
+                    ->default(fn() => \App\Models\Client::getDefaultDispositions())
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -79,6 +86,7 @@ class ClientResource extends Resource
     {
         return [
             ClientEmailsRelationManager::class,
+            RelationManagers\LeadsRelationManager::class,
         ];
     }
 

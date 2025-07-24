@@ -16,6 +16,7 @@ class Lead extends Model
         'email',
         'phone',
         'message',
+        'notes',
         'from_email',
         'email_subject',
         'email_received_at',
@@ -36,10 +37,27 @@ class Lead extends Model
             'email' => 'nullable|email|required_without:phone',
             'phone' => 'nullable|string|required_without:email',
             'message' => 'nullable|string',
-            'status' => 'required|in:new,contacted,qualified,converted,lost',
+            'notes' => 'nullable|string',
+            'status' => 'required|string',
             'from_email' => 'nullable|email',
             'source' => 'required|in:website,phone,referral,social,other',
             'client_id' => 'required|exists:clients,id',
         ];
+    }
+
+    /**
+     * Get validation rules for a specific client
+     */
+    public static function rulesForClient($clientId): array
+    {
+        $rules = self::rules();
+
+        $client = Client::find($clientId);
+        if ($client) {
+            $validStatuses = array_keys($client->getLeadDispositions());
+            $rules['status'] = 'required|in:' . implode(',', $validStatuses);
+        }
+
+        return $rules;
     }
 }

@@ -48,18 +48,22 @@ class LeadResource extends Resource
                 Forms\Components\Textarea::make('message')
                     ->columnSpanFull()
                     ->disabled(),
+                Forms\Components\Textarea::make('notes')
+                    ->label('Notes')
+                    ->helperText('Add your notes about this lead')
+                    ->columnSpanFull()
+                    ->rows(4),
                 Forms\Components\TextInput::make('from_email')
                     ->email()
                     ->label('From Email')
                     ->disabled(),
                 Forms\Components\Select::make('status')
-                    ->options([
-                        'new' => 'New',
-                        'contacted' => 'Contacted',
-                        'qualified' => 'Qualified',
-                        'converted' => 'Converted',
-                        'lost' => 'Lost',
-                    ])
+                    ->label('Disposition')
+                    ->options(function () {
+                        $user = Filament::auth()->user();
+                        $client = \App\Models\Client::find($user->client_id);
+                        return $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                    })
                     ->required(),
                 Forms\Components\Select::make('source')
                     ->options([
@@ -97,6 +101,7 @@ class LeadResource extends Resource
 
                         Tables\Columns\Layout\Stack::make([
                             Tables\Columns\TextColumn::make('status')
+                                ->label('Disposition')
                                 ->badge()
                                 ->color(fn(string $state): string => match ($state) {
                                     'new' => 'success',
@@ -106,7 +111,36 @@ class LeadResource extends Resource
                                     'lost' => 'danger',
                                     default => 'gray',
                                 })
-                                ->formatStateUsing(fn(string $state): string => ucfirst($state)),
+                                ->formatStateUsing(function (string $state, $record): string {
+                                    $client = $record->client;
+                                    $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                                    return $dispositions[$state] ?? ucfirst($state);
+                                })
+                                ->action(
+                                    Tables\Actions\Action::make('change_disposition')
+                                        ->label('Change Disposition')
+                                        ->icon('heroicon-m-adjustments-horizontal')
+                                        ->form(function (Lead $record) {
+                                            $client = $record->client;
+                                            $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                                            
+                                            return [
+                                                Forms\Components\Select::make('status')
+                                                    ->label('Select Disposition')
+                                                    ->options($dispositions)
+                                                    ->default($record->status)
+                                                    ->required()
+                                                    ->native(false)
+                                                    ->placeholder('Choose a disposition...')
+                                            ];
+                                        })
+                                        ->action(function (Lead $record, array $data) {
+                                            $record->update(['status' => $data['status']]);
+                                        })
+                                        ->modalHeading('Change Lead Disposition')
+                                        ->modalSubmitActionLabel('Update Disposition')
+                                        ->modalWidth('md')
+                                ),
                             Tables\Columns\TextColumn::make('source')
                                 ->badge()
                                 ->color('gray')
@@ -148,19 +182,26 @@ class LeadResource extends Resource
                             ->placeholder('No message content')
                             ->wrap(),
                     ])->collapsible(),
+                    
+                    // Notes field outside the collapsible panel to avoid click conflicts
+                    Tables\Columns\TextInputColumn::make('notes')
+                        ->placeholder('Add notes...')
+                        ->extraAttributes(['class' => 'text-xs mt-2'])
+                        ->tooltip('Click to edit notes')
+                        ->label('Notes'),
                 ])->space(2),
             ])
+            ->recordUrl(null) // Disable automatic row clicking to view page
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'new' => 'New',
-                        'contacted' => 'Contacted',
-                        'qualified' => 'Qualified',
-                        'converted' => 'Converted',
-                        'lost' => 'Lost',
-                    ])
+                    ->label('Disposition')
+                    ->options(function () {
+                        $user = Filament::auth()->user();
+                        $client = \App\Models\Client::find($user->client_id);
+                        return $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                    })
                     ->multiple()
-                    ->placeholder('All Statuses'),
+                    ->placeholder('All Dispositions'),
                 Tables\Filters\SelectFilter::make('source')
                     ->options([
                         'website' => 'Website',
@@ -181,32 +222,69 @@ class LeadResource extends Resource
                     ->indicator('Needs attention'),
             ])
             ->actions([
-                Tables\Actions\Action::make('contact')
-                    ->icon('heroicon-m-phone')
-                    ->color('success')
-                    ->action(function (Lead $record) {
-                        $record->update(['status' => 'contacted']);
-                    })
-                    ->visible(fn(Lead $record) => $record->status === 'new')
-                    ->requiresConfirmation()
-                    ->modalHeading('Mark as Contacted')
-                    ->modalDescription('Are you sure you want to mark this lead as contacted?'),
-                Tables\Actions\ViewAction::make()
-                    ->icon('heroicon-m-eye'),
-                Tables\Actions\EditAction::make()
-                    ->icon('heroicon-m-pencil-square'),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('contact')
+                        ->icon('heroicon-m-phone')
+                        ->color('success')
+                        ->action(function (Lead $record) {
+                            // Check if 'contacted' exists in client's dispositions, otherwise use first available
+                            $client = $record->client;
+                            $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                            $contactedStatus = array_key_exists('contacted', $dispositions) ? 'contacted' : array_key_first($dispositions);
+                            $record->update(['status' => $contactedStatus]);
+                        })
+                        ->visible(fn(Lead $record) => $record->status === 'new')
+                        ->requiresConfirmation()
+                        ->modalHeading('Mark as Contacted')
+                        ->modalDescription('Are you sure you want to mark this lead as contacted?'),
+                    Tables\Actions\Action::make('quick_disposition')
+                        ->label('Quick Update')
+                        ->icon('heroicon-m-adjustments-horizontal')
+                        ->color('warning')
+                        ->form(function (Lead $record) {
+                            $client = $record->client;
+                            $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                            
+                            return [
+                                Forms\Components\Select::make('status')
+                                    ->label('Change Disposition')
+                                    ->options($dispositions)
+                                    ->default($record->status)
+                                    ->required(),
+                                Forms\Components\Textarea::make('notes')
+                                    ->label('Add/Update Notes')
+                                    ->default($record->notes)
+                                    ->rows(3)
+                                    ->placeholder('Add any notes about this lead...')
+                            ];
+                        })
+                        ->action(function (Lead $record, array $data) {
+                            $record->update([
+                                'status' => $data['status'],
+                                'notes' => $data['notes']
+                            ]);
+                        })
+                        ->modalHeading('Quick Update')
+                        ->modalSubmitActionLabel('Update Lead'),
+                ])
+                ->icon('heroicon-m-ellipsis-vertical')
+                ->size('sm')
+                ->color('gray')
+                ->button(),
                 Tables\Actions\Action::make('call')
                     ->icon('heroicon-m-phone')
                     ->color('info')
                     ->url(fn(Lead $record) => $record->phone ? "tel:{$record->phone}" : null)
                     ->visible(fn(Lead $record) => !empty($record->phone))
-                    ->openUrlInNewTab(false),
+                    ->openUrlInNewTab(false)
+                    ->tooltip('Call lead'),
                 Tables\Actions\Action::make('email')
                     ->icon('heroicon-m-envelope')
                     ->color('warning')
                     ->url(fn(Lead $record) => $record->email ? "mailto:{$record->email}" : null)
                     ->visible(fn(Lead $record) => !empty($record->email))
-                    ->openUrlInNewTab(false),
+                    ->openUrlInNewTab(false)
+                    ->tooltip('Email lead'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('mark_contacted')
@@ -214,11 +292,39 @@ class LeadResource extends Resource
                     ->icon('heroicon-m-check')
                     ->color('success')
                     ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
-                        $records->each(fn(Lead $record) => $record->update(['status' => 'contacted']));
+                        $records->each(function (Lead $record) {
+                            $client = $record->client;
+                            $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                            $contactedStatus = array_key_exists('contacted', $dispositions) ? 'contacted' : array_key_first($dispositions);
+                            $record->update(['status' => $contactedStatus]);
+                        });
                     })
                     ->requiresConfirmation()
                     ->modalHeading('Mark leads as contacted')
                     ->modalDescription('Are you sure you want to mark the selected leads as contacted?'),
+                Tables\Actions\BulkAction::make('bulk_disposition')
+                    ->label('Change Disposition')
+                    ->icon('heroicon-m-adjustments-horizontal')
+                    ->color('warning')
+                    ->form(function () {
+                        $user = Filament::auth()->user();
+                        $client = \App\Models\Client::find($user->client_id);
+                        $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                        
+                        return [
+                            Forms\Components\Select::make('status')
+                                ->label('New Disposition')
+                                ->options($dispositions)
+                                ->required(),
+                        ];
+                    })
+                    ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data) {
+                        $records->each(fn(Lead $record) => $record->update(['status' => $data['status']]));
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Change disposition for selected leads')
+                    ->modalDescription('This will update the disposition for all selected leads.')
+                    ->modalSubmitActionLabel('Update Dispositions'),
             ])
             ->defaultSort('created_at', 'desc')
             ->poll('30s')

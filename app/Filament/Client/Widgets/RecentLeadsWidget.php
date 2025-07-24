@@ -32,6 +32,7 @@ class RecentLeadsWidget extends BaseWidget
                     ->icon('heroicon-m-envelope')
                     ->color('gray'),
                 Tables\Columns\TextColumn::make('status')
+                    ->label('Disposition')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
                         'new' => 'success',
@@ -40,6 +41,11 @@ class RecentLeadsWidget extends BaseWidget
                         'converted' => 'success',
                         'lost' => 'danger',
                         default => 'gray',
+                    })
+                    ->formatStateUsing(function (string $state, $record): string {
+                        $client = $record->client;
+                        $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+                        return $dispositions[$state] ?? ucfirst($state);
                     }),
                 Tables\Columns\TextColumn::make('created_at')
                     ->since()

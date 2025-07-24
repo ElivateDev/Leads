@@ -13,10 +13,15 @@ class LeadStatsWidget extends BaseWidget
     {
         $user = Filament::auth()->user();
         $clientId = $user->client_id;
+        $client = \App\Models\Client::find($clientId);
 
         $totalLeads = Lead::where('client_id', $clientId)->count();
         $newLeads = Lead::where('client_id', $clientId)->where('status', 'new')->count();
-        $convertedLeads = Lead::where('client_id', $clientId)->where('status', 'converted')->count();
+
+        // Check if 'converted' exists in client's dispositions, otherwise use the last disposition
+        $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
+        $convertedStatus = array_key_exists('converted', $dispositions) ? 'converted' : array_key_last($dispositions);
+        $convertedLeads = Lead::where('client_id', $clientId)->where('status', $convertedStatus)->count();
 
         $conversionRate = $totalLeads > 0 ? round(($convertedLeads / $totalLeads) * 100, 1) : 0;
 

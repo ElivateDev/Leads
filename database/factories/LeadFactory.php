@@ -24,6 +24,7 @@ class LeadFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->phoneNumber(),
             'message' => fake()->paragraph(),
+            'notes' => fake()->optional(0.3)->sentence(), // 30% chance of having notes
             'from_email' => fake()->safeEmail(),
             'status' => fake()->randomElement(['new', 'contacted', 'qualified', 'converted', 'lost']),
             'source' => fake()->randomElement(['website', 'phone', 'referral', 'social', 'other']),

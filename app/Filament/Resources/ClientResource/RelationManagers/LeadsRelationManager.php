@@ -1,37 +1,32 @@
 <?php
 
-namespace App\Filament\Resources;
+namespace App\Filament\Resources\ClientResource\RelationManagers;
 
-use App\Filament\Resources\LeadResource\Pages;
-use App\Filament\Resources\LeadResource\RelationManagers;
-use App\Models\Lead;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
+use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class LeadResource extends Resource
+class LeadsRelationManager extends RelationManager
 {
-    protected static ?string $model = Lead::class;
+    protected static string $relationship = 'leads';
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-
-    public static function form(Form $form): Form
+    public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('client_id')
-                    ->relationship('client', 'name')
-                    ->required(),
                 Forms\Components\TextInput::make('name')
-                    ->required(),
+                    ->required()
+                    ->maxLength(255),
                 Forms\Components\TextInput::make('email')
-                    ->email(),
+                    ->email()
+                    ->maxLength(255),
                 Forms\Components\TextInput::make('phone')
-                    ->tel(),
+                    ->tel()
+                    ->maxLength(255),
                 Forms\Components\Textarea::make('message')
                     ->columnSpanFull(),
                 Forms\Components\Textarea::make('notes')
@@ -42,17 +37,14 @@ class LeadResource extends Resource
                 Forms\Components\TextInput::make('from_email')
                     ->email()
                     ->label('From Email')
-                    ->helperText('Email address from which the lead was generated'),
+                    ->helperText('Email address from which the lead was generated')
+                    ->maxLength(255),
                 Forms\Components\Select::make('status')
-                    ->options(function (Forms\Get $get) {
-                        $clientId = $get('client_id');
-                        if ($clientId) {
-                            $client = \App\Models\Client::find($clientId);
-                            return $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
-                        }
-                        return \App\Models\Client::getDefaultDispositions();
+                    ->label('Disposition')
+                    ->options(function (RelationManager $livewire) {
+                        return $livewire->getOwnerRecord()->getLeadDispositions();
                     })
-                    ->reactive()
+                    ->required()
                     ->default('new'),
                 Forms\Components\Select::make('source')
                     ->options([
@@ -62,19 +54,19 @@ class LeadResource extends Resource
                         'social' => 'Social Media',
                         'other' => 'Other',
                     ])
+                    ->required()
                     ->default('website'),
             ]);
     }
 
-    public static function table(Table $table): Table
+    public function table(Table $table): Table
     {
         return $table
+            ->recordTitleAttribute('name')
             ->columns([
-                Tables\Columns\TextColumn::make('client.name')
-                    ->numeric()
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('phone')
@@ -87,25 +79,11 @@ class LeadResource extends Resource
                     })
                     ->placeholder('No notes')
                     ->color('info')
-                    ->icon('heroicon-m-pencil-square')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('from_email')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(function (string $state, $record) {
-                        $client = $record->client;
-                        $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
-                        return $dispositions[$state] ?? ucfirst($state);
-                    })
-                    ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'new' => 'info',
-                        'contacted' => 'warning',
-                        'qualified' => 'success',
-                        'converted' => 'success',
-                        'lost' => 'danger',
-                        default => 'gray',
+                    ->icon('heroicon-m-pencil-square'),
+                Tables\Columns\SelectColumn::make('status')
+                    ->label('Disposition')
+                    ->options(function (RelationManager $livewire) {
+                        return $livewire->getOwnerRecord()->getLeadDispositions();
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('source')
@@ -119,16 +97,14 @@ class LeadResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->options(\App\Models\Client::getDefaultDispositions()),
+                    ->label('Disposition')
+                    ->options(function (RelationManager $livewire) {
+                        return $livewire->getOwnerRecord()->getLeadDispositions();
+                    }),
                 Tables\Filters\SelectFilter::make('source')
                     ->options([
                         'website' => 'Website',
@@ -137,8 +113,9 @@ class LeadResource extends Resource
                         'social' => 'Social Media',
                         'other' => 'Other',
                     ]),
-                Tables\Filters\SelectFilter::make('client')
-                    ->relationship('client', 'name'),
+            ])
+            ->headerActions([
+                Tables\Actions\CreateAction::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -150,21 +127,5 @@ class LeadResource extends Resource
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
-    }
-
-    public static function getPages(): array
-    {
-        return [
-            'index' => Pages\ListLeads::route('/'),
-            'create' => Pages\CreateLead::route('/create'),
-            'edit' => Pages\EditLead::route('/{record}/edit'),
-        ];
     }
 }

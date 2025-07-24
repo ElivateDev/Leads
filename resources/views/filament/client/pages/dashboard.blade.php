@@ -15,7 +15,7 @@
         <x-filament::section>
             <x-slot name="heading">Quick Actions</x-slot>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
                 <x-filament::card>
                     <a href="{{ route('filament.client.resources.leads.index') }}"
                         class="block p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -56,6 +56,21 @@
                             <div class="ml-4">
                                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Needs Attention</h3>
                                 <p class="text-sm text-gray-500 dark:text-gray-400">Leads requiring follow-up</p>
+                            </div>
+                        </div>
+                    </a>
+                </x-filament::card>
+
+                <x-filament::card>
+                    <a href="{{ route('filament.client.resources.leads.index', ['tableFilters' => ['status' => ['values' => ['lost']]]]) }}"
+                        class="block p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <x-heroicon-o-arrow-path class="h-8 w-8 text-danger-600" />
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Lost Leads</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Recontact potential customers</p>
                             </div>
                         </div>
                     </a>
