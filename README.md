@@ -212,7 +212,25 @@ Combined Rules require BOTH email pattern AND body text conditions to be met:
 
 ##### Rule Processing Order
 
-Rules are processed in the order they're found in the database. The first matching rule will be used to route the email. More specific rules should generally be created before more general ones.
+**All matching rules are processed**: When an email arrives, the system checks ALL distribution rules and creates leads for every client that has a matching rule. This means:
+
+-   **Multiple clients can receive the same lead**: If two clients have identical rules (e.g., both want `leads@zillow.com`), both will receive a copy of the lead
+-   **No rule priority system**: All matching rules are treated equally - there's no "first match wins" behavior
+-   **Comprehensive rule matching**: The system processes exact email matches, domain patterns, custom rules, and combined rules to find all possible matches
+
+**Best Practices**:
+
+-   Use specific conditions to avoid unwanted duplicates
+-   For shared email sources, differentiate rules with custom conditions (e.g., `rep: john` vs `rep: sarah`)
+-   Monitor rule logs to identify overlapping rules that might need adjustment
+
+**Rule Types Processed** (in this order, but all matches are included):
+
+1. Exact email address matches
+2. Domain pattern matches (@domain.com)
+3. Custom body text rules
+4. Combined rules (email + body text)
+5. Fallback to client domain matching
 
 #### Example Use Cases
 
@@ -235,6 +253,35 @@ Rules are processed in the order they're found in the database. The first matchi
     - `leads@facebook.com` + `rep: henry` → Only Facebook emails for Henry
     - `@zillow.com` + `property_type: commercial AND agent: sarah` → Zillow commercial leads for Sarah
     - `support@company.com` + `priority: high OR urgent: true` → High priority support emails
+
+#### Handling Duplicate Rules
+
+The system supports multiple clients having identical or overlapping distribution rules. This is useful for:
+
+**Lead Distribution Scenarios**:
+
+-   **Team Lead Distribution**: Multiple agents want leads from the same source
+-   **Backup Coverage**: Primary and backup agents for the same lead source
+-   **Cross-Department Routing**: Sales and support teams both need certain emails
+
+**Example: Multiple Agents for Zillow Leads**
+
+```
+Agent 1: leads@zillow.com → Creates lead for Agent 1
+Agent 2: leads@zillow.com → Creates lead for Agent 2
+Result: One Zillow email creates leads for both agents
+```
+
+**Example: Differentiated Rules for Same Source**
+
+```
+Agent 1: leads@zillow.com + "rep: john" → Only John's Zillow leads
+Agent 2: leads@zillow.com + "rep: sarah" → Only Sarah's Zillow leads
+General: leads@zillow.com → All other Zillow leads
+Result: Selective distribution based on email content
+```
+
+**Monitoring**: Check the Email Processing Logs to see which rules matched for each email and verify leads are being distributed as expected.
 
 #### Leads
 

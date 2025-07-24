@@ -123,7 +123,7 @@ class LeadResource extends Resource
                                         ->form(function (Lead $record) {
                                             $client = $record->client;
                                             $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
-                                            
+
                                             return [
                                                 Forms\Components\Select::make('status')
                                                     ->label('Select Disposition')
@@ -182,7 +182,7 @@ class LeadResource extends Resource
                             ->placeholder('No message content')
                             ->wrap(),
                     ])->collapsible(),
-                    
+
                     // Notes field outside the collapsible panel to avoid click conflicts
                     Tables\Columns\TextInputColumn::make('notes')
                         ->placeholder('Add notes...')
@@ -244,7 +244,7 @@ class LeadResource extends Resource
                         ->form(function (Lead $record) {
                             $client = $record->client;
                             $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
-                            
+
                             return [
                                 Forms\Components\Select::make('status')
                                     ->label('Change Disposition')
@@ -267,10 +267,10 @@ class LeadResource extends Resource
                         ->modalHeading('Quick Update')
                         ->modalSubmitActionLabel('Update Lead'),
                 ])
-                ->icon('heroicon-m-ellipsis-vertical')
-                ->size('sm')
-                ->color('gray')
-                ->button(),
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->size('sm')
+                    ->color('gray')
+                    ->button(),
                 Tables\Actions\Action::make('call')
                     ->icon('heroicon-m-phone')
                     ->color('info')
@@ -310,7 +310,7 @@ class LeadResource extends Resource
                         $user = Filament::auth()->user();
                         $client = \App\Models\Client::find($user->client_id);
                         $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
-                        
+
                         return [
                             Forms\Components\Select::make('status')
                                 ->label('New Disposition')
