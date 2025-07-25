@@ -17,13 +17,13 @@ class ClientResource extends Resource
     protected static ?string $model = Client::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
-    
+
     protected static ?string $navigationLabel = 'Settings';
-    
+
     protected static ?string $modelLabel = 'Settings';
-    
+
     protected static ?string $pluralModelLabel = 'Settings';
-    
+
     protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
@@ -50,7 +50,7 @@ class ClientResource extends Resource
                             ->required()
                             ->maxLength(255),
                     ])->columns(2),
-                    
+
                 Forms\Components\Section::make('Email Notifications')
                     ->description('Configure who receives email notifications for new leads')
                     ->schema([
@@ -68,15 +68,15 @@ class ClientResource extends Resource
                                     ->required()
                                     ->placeholder('user@example.com'),
                             ])
-                            ->itemLabel(fn (array $state): ?string => $state['email'] ?? null)
+                            ->itemLabel(fn(array $state): ?string => $state['email'] ?? null)
                             ->addActionLabel('Add Email Address')
                             ->collapsible()
                             ->cloneable()
                             ->defaultItems(0)
-                            ->visible(fn (Forms\Get $get): bool => $get('email_notifications'))
+                            ->visible(fn(Forms\Get $get): bool => $get('email_notifications'))
                             ->columnSpanFull(),
                     ]),
-                    
+
                 Forms\Components\Section::make('Lead Management Settings')
                     ->description('Customize how leads are categorized and tracked')
                     ->schema([
@@ -111,8 +111,8 @@ class ClientResource extends Resource
                     ->label('Notifications')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('notification_emails_count')
-                    ->label('Additional Emails')
-                    ->getStateUsing(fn (Client $record) => count($record->notification_emails ?? [])),
+                    ->label('Notification Recipients')
+                    ->getStateUsing(fn(Client $record) => count($record->notification_emails ?? [])),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()

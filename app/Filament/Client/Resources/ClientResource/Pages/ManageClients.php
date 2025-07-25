@@ -17,7 +17,18 @@ class ManageClients extends ManageRecords
             // No create action - clients manage their existing settings
         ];
     }
-    
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        // Transform repeater format back to array of emails
+        if (!empty($data['notification_emails'])) {
+            $data['notification_emails'] = array_column($data['notification_emails'], 'email');
+            $data['notification_emails'] = array_filter($data['notification_emails']); // Remove empty values
+        }
+
+        return $data;
+    }
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
         // Transform notification_emails array to repeater format
@@ -26,18 +37,7 @@ class ManageClients extends ManageRecords
                 return ['email' => $email];
             }, $data['notification_emails']);
         }
-        
-        return $data;
-    }
-    
-    protected function mutateFormDataBeforeSave(array $data): array
-    {
-        // Transform repeater format back to array of emails
-        if (!empty($data['notification_emails'])) {
-            $data['notification_emails'] = array_column($data['notification_emails'], 'email');
-            $data['notification_emails'] = array_filter($data['notification_emails']); // Remove empty values
-        }
-        
+
         return $data;
     }
 }
