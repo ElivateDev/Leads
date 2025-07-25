@@ -86,6 +86,7 @@ class LeadObserver
                             'notification_class' => NewLeadNotification::class,
                             'lead_id' => $lead->id,
                             'delivery_timestamp' => now()->toISOString(),
+                            'note' => 'Email sent immediately (not queued)',
                         ]);
 
                         $successfulSends[] = $email;
@@ -101,8 +102,9 @@ class LeadObserver
                                 'recipient_email' => $email,
                                 'lead_name' => $lead->name,
                                 'smtp_host' => config('mail.mailers.smtp.host'),
-                                'delivery_status' => 'sent_successfully',
+                                'delivery_status' => 'sent_immediately',
                                 'delivery_timestamp' => now()->toISOString(),
+                                'note' => 'Email sent immediately (not queued)',
                             ]
                         );
                     } catch (\Exception $individualEmailException) {
