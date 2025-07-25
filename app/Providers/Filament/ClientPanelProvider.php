@@ -35,6 +35,7 @@ class ClientPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Client/Pages'), for: 'App\\Filament\\Client\\Pages')
             ->pages([
                 \App\Filament\Client\Pages\Dashboard::class,
+                \App\Filament\Client\Pages\LeadBoard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Client/Widgets'), for: 'App\\Filament\\Client\\Widgets')
             ->widgets([
