@@ -29,6 +29,9 @@ class ClientPanelProvider extends PanelProvider
             ->login()
             ->authGuard('web')
             ->brandLogoHeight('2rem')
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarFullyCollapsibleOnDesktop()
+            ->maxContentWidth('full')
             ->colors([
                 'primary' => Color::Blue,
             ])
