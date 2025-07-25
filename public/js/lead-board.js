@@ -15,13 +15,13 @@ function safeLivewireCall(method, ...args) {
     try {
         if (typeof Livewire === 'undefined' || !Livewire.find) {
             console.warn('Livewire not available, skipping call to:', method);
-            return false;
+            return Promise.reject(new Error('Livewire not available'));
         }
 
         const wireElement = document.querySelector('[wire\\:id]');
         if (!wireElement) {
             console.warn('No Livewire component found in DOM');
-            return false;
+            return Promise.reject(new Error('No Livewire component found'));
         }
 
         const wireId = wireElement.getAttribute('wire:id');
@@ -29,14 +29,13 @@ function safeLivewireCall(method, ...args) {
 
         if (!component || !component.call) {
             console.warn('Livewire component not found or method not available');
-            return false;
+            return Promise.reject(new Error('Livewire component not available'));
         }
 
-        component.call(method, ...args);
-        return true;
+        return component.call(method, ...args);
     } catch (error) {
         console.warn(`Failed to call Livewire method ${method}:`, error);
-        return false;
+        return Promise.reject(error);
     }
 }
 
@@ -94,9 +93,7 @@ function saveNotes() {
 
     const notes = document.getElementById('notes-textarea').value;
 
-    // Call Livewire method to save notes
     safeLivewireCall('updateLeadNotes', currentLeadId, notes);
-
     closeNotesModal();
 }
 
@@ -110,52 +107,38 @@ function initializeDragAndDrop() {
 
 // Initialize filter functionality
 function initializeFilters() {
-    // Get saved filter panel state from localStorage (default to expanded since HTML defaults to expanded)
     const savedPanelState = localStorage.getItem('leadboard-filter-panel-open');
-    filterPanelOpen = savedPanelState !== 'false'; // Default to true (expanded) if no saved state
+    filterPanelOpen = savedPanelState !== 'false';
 
-    // Apply the saved panel state to the UI (since HTML defaults to expanded, we only need to collapse if saved state is false)
     const filterOptions = document.getElementById('filter-options');
     const toggleIcon = document.querySelector('.filter-toggle-icon');
 
     if (!filterPanelOpen) {
-        // Only collapse if the saved state is false
         filterOptions.style.display = 'none';
         if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
     }
-    // If filterPanelOpen is true, we don't need to do anything as HTML defaults to expanded
 
-    // Prioritize localStorage (immediate) over database (delayed), then use database as fallback
     const saved = localStorage.getItem('leadboard-visible-dispositions');
     if (saved) {
         visibleDispositions = JSON.parse(saved);
     } else if (window.initialVisibleDispositions) {
         visibleDispositions = window.initialVisibleDispositions;
     } else {
-        // Default to all dispositions visible
         visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
             col.dataset.disposition
         );
     }
 
-    // Load column order from database or localStorage
-    initializeColumnOrder();
-
-    // Initialize filter event listeners
+    initializeColumnOrderOnLoad();
     initializeFilterEventListeners();
-
-    // Apply filter display and column visibility immediately (no database calls during init)
     updateFilterDisplay();
     updateColumnVisibilityOnly();
     updateScrollIndicator();
-
-    // Set up a MutationObserver to restore filter state when DOM changes
     initializeFilterStateProtection();
 }
 
-// Initialize column ordering
-function initializeColumnOrder() {
-    // Prioritize localStorage (immediate) over database (delayed), then use database as fallback
+// Initialize column ordering on page load
+function initializeColumnOrderOnLoad() {
     const savedOrder = localStorage.getItem('leadboard-column-order');
     if (savedOrder) {
         columnOrder = JSON.parse(savedOrder);
@@ -164,10 +147,45 @@ function initializeColumnOrder() {
         columnOrder = window.initialColumnOrder;
         applyColumnOrder();
     } else {
-        // Default order based on current DOM order
         columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
             col.dataset.disposition
         );
+    }
+}
+
+// Restore column order after lead drop
+function restoreColumnOrder() {
+    if (window.columnOrderBeforeDrop) {
+        const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+            col.dataset.disposition
+        );
+        
+        columnOrder = window.columnOrderBeforeDrop;
+        const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
+        
+        if (needsReordering) {
+            applyColumnOrder();
+        }
+        
+        window.columnOrderBeforeDrop = null;
+    }
+}
+
+// Initialize column ordering (for restoration after updates)
+function initializeColumnOrder() {
+    if (window.columnOrderBeforeDrop) {
+        const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+            col.dataset.disposition
+        );
+        
+        columnOrder = window.columnOrderBeforeDrop;
+        const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
+        
+        if (needsReordering) {
+            applyColumnOrder();
+        }
+        
+        window.columnOrderBeforeDrop = null;
     }
 }
 
@@ -176,13 +194,17 @@ function applyColumnOrder() {
     const columnsContainer = document.getElementById('disposition-columns');
     if (!columnsContainer) return;
 
-    // Add a brief opacity transition to smooth the reordering
+    const columns = Array.from(columnsContainer.children);
+    const currentOrder = columns.map(col => col.dataset.disposition);
+    const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
+    
+    if (!needsReordering) {
+        return;
+    }
+
     columnsContainer.style.transition = 'opacity 0.15s ease';
     columnsContainer.style.opacity = '0.7';
 
-    const columns = Array.from(columnsContainer.children);
-
-    // Sort columns based on saved order
     columnOrder.forEach((dispositionKey, index) => {
         const column = columns.find(col => col.dataset.disposition === dispositionKey);
         if (column) {
@@ -190,7 +212,6 @@ function applyColumnOrder() {
         }
     });
 
-    // Restore opacity after a brief delay
     setTimeout(() => {
         columnsContainer.style.opacity = '1';
         setTimeout(() => {
@@ -200,15 +221,11 @@ function applyColumnOrder() {
 }
 
 // Save column order to localStorage and database
-// Save column order to localStorage and database
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
     columnOrder = columns.map(col => col.dataset.disposition);
 
-    // Save to localStorage for immediate feedback
     localStorage.setItem('leadboard-column-order', JSON.stringify(columnOrder));
-
-    // Save to database via Livewire
     safeLivewireCall('updateColumnOrder', columnOrder);
 }
 
@@ -408,26 +425,18 @@ function updateColumnVisibilityOnly() {
     }, 100);
 }
 
-// Toggle disposition visibility
 function toggleDisposition(dispositionKey) {
     const index = visibleDispositions.indexOf(dispositionKey);
 
     if (index > -1) {
-        // Remove from visible
         visibleDispositions.splice(index, 1);
     } else {
-        // Add to visible
         visibleDispositions.push(dispositionKey);
     }
 
-    // Save to localStorage immediately for instant persistence
     localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
-
     updateFilterDisplay();
     updateColumnVisibilityOnly();
-
-    // Don't save to database automatically - only on panel close or page unload
-    // saveFilterStateToDatabase();
 }
 
 // Select all dispositions
@@ -749,19 +758,36 @@ document.addEventListener('drop', function(e) {
 
         // Update lead disposition via Livewire
         if (draggedLeadId && newDisposition) {
-            // Use the wire directive to call the method
-            safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition);
+            const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+                col.dataset.disposition
+            );
+            window.columnOrderBeforeDrop = currentOrder;
+            
+            safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition)
+                .then(() => {
+                    setTimeout(() => {
+                        restoreColumnOrder();
+                    }, 200);
+                })
+                .catch((error) => {
+                    setTimeout(() => {
+                        restoreColumnOrder();
+                    }, 200);
+                });
         }
     }
 });
 
 // Livewire event listeners - only reinitialize drag and drop, filters are pure client-side
-document.addEventListener('livewire:updated', function() {
+document.addEventListener('livewire:updated', function(event) {
     setTimeout(() => {
+        if (window.restoreColumnOrderAfterUpdate) {
+            initializeColumnOrder();
+            window.restoreColumnOrderAfterUpdate = false;
+        }
+        
         initializeDragAndDrop();
         updateScrollIndicator();
-
-        // Reapply filter states without reinitializing the whole filter system
         updateFilterDisplay();
         updateColumnVisibilityOnly();
     }, 100);
@@ -776,7 +802,6 @@ window.addEventListener('resize', function() {
 
 // Save filter state when page unloads
 window.addEventListener('beforeunload', function() {
-    // Clear any pending timeout and save immediately
     if (saveFilterStateToDatabase.timeout) {
         clearTimeout(saveFilterStateToDatabase.timeout);
     }
@@ -786,11 +811,8 @@ window.addEventListener('beforeunload', function() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
-
-    // Initialize filters (this will wait for Livewire for database calls)
     initializeFilters();
 
-    // Add scroll listener to columns container
     const columnsContainer = document.getElementById('disposition-columns');
     if (columnsContainer) {
         columnsContainer.addEventListener('scroll', function() {
