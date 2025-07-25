@@ -536,8 +536,21 @@ function initializeFilterStateProtection() {
         if (shouldRestoreState) {
             // Restore filter state after a brief delay
             setTimeout(() => {
+                // Restore filter selections
                 updateFilterDisplay();
                 updateColumnVisibilityOnly();
+                
+                // Restore panel open/closed state
+                const filterOptions = document.getElementById('filter-options');
+                const toggleIcon = document.querySelector('.filter-toggle-icon');
+                
+                if (filterPanelOpen) {
+                    filterOptions.style.display = 'grid';
+                    if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+                } else {
+                    filterOptions.style.display = 'none';
+                    if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
+                }
             }, 10);
         }
     });
