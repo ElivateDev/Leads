@@ -8,6 +8,7 @@ let columnOrder = [];
 let draggedColumn = null;
 let dropIndicator = null;
 let currentLeadId = null;
+let filterPanelOpen = false; // Pure client-side state for filter panel
 
 // Helper function to safely call Livewire methods
 function safeLivewireCall(method, ...args) {
@@ -101,8 +102,6 @@ function saveNotes() {
 
 // Initialize drag and drop functionality
 function initializeDragAndDrop() {
-    console.log('Initializing drag and drop...');
-
     // Make sure all lead cards are draggable
     document.querySelectorAll('.lead-card').forEach(card => {
         card.draggable = true;
@@ -111,53 +110,64 @@ function initializeDragAndDrop() {
 
 // Initialize filter functionality
 function initializeFilters() {
-    // Use initial data from database, fall back to localStorage, then default to all
-    if (window.initialVisibleDispositions) {
+    // Get saved filter panel state from localStorage (default to expanded since HTML defaults to expanded)
+    const savedPanelState = localStorage.getItem('leadboard-filter-panel-open');
+    filterPanelOpen = savedPanelState !== 'false'; // Default to true (expanded) if no saved state
+
+    // Apply the saved panel state to the UI (since HTML defaults to expanded, we only need to collapse if saved state is false)
+    const filterOptions = document.getElementById('filter-options');
+    const toggleIcon = document.querySelector('.filter-toggle-icon');
+
+    if (!filterPanelOpen) {
+        // Only collapse if the saved state is false
+        filterOptions.style.display = 'none';
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
+    }
+    // If filterPanelOpen is true, we don't need to do anything as HTML defaults to expanded
+
+    // Prioritize localStorage (immediate) over database (delayed), then use database as fallback
+    const saved = localStorage.getItem('leadboard-visible-dispositions');
+    if (saved) {
+        visibleDispositions = JSON.parse(saved);
+    } else if (window.initialVisibleDispositions) {
         visibleDispositions = window.initialVisibleDispositions;
     } else {
-        const saved = localStorage.getItem('leadboard-visible-dispositions');
-        if (saved) {
-            visibleDispositions = JSON.parse(saved);
-        } else {
-            // Default to all dispositions visible
-            visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-                col.dataset.disposition
-            );
-        }
+        // Default to all dispositions visible
+        visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+            col.dataset.disposition
+        );
     }
 
     // Load column order from database or localStorage
     initializeColumnOrder();
 
-    // Wait for Livewire before making database calls
-    waitForLivewire(function() {
-        updateColumnVisibility();
-    });
+    // Initialize filter event listeners
+    initializeFilterEventListeners();
 
+    // Apply filter display and column visibility immediately (no database calls during init)
     updateFilterDisplay();
+    updateColumnVisibilityOnly();
     updateScrollIndicator();
+
+    // Set up a MutationObserver to restore filter state when DOM changes
+    initializeFilterStateProtection();
 }
 
 // Initialize column ordering
 function initializeColumnOrder() {
-    // Use initial data from database, fall back to localStorage, then default order
-    if (window.initialColumnOrder) {
+    // Prioritize localStorage (immediate) over database (delayed), then use database as fallback
+    const savedOrder = localStorage.getItem('leadboard-column-order');
+    if (savedOrder) {
+        columnOrder = JSON.parse(savedOrder);
+        applyColumnOrder();
+    } else if (window.initialColumnOrder) {
         columnOrder = window.initialColumnOrder;
-        console.log('Loaded column order from database:', columnOrder);
         applyColumnOrder();
     } else {
-        const savedOrder = localStorage.getItem('leadboard-column-order');
-        if (savedOrder) {
-            columnOrder = JSON.parse(savedOrder);
-            console.log('Loaded saved column order from localStorage:', columnOrder);
-            applyColumnOrder();
-        } else {
-            // Default order based on current DOM order
-            columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-                col.dataset.disposition
-            );
-            console.log('Using default column order:', columnOrder);
-        }
+        // Default order based on current DOM order
+        columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+            col.dataset.disposition
+        );
     }
 }
 
@@ -171,8 +181,6 @@ function applyColumnOrder() {
     columnsContainer.style.opacity = '0.7';
 
     const columns = Array.from(columnsContainer.children);
-    console.log('Applying column order:', columnOrder);
-    console.log('Current columns:', columns.map(col => col.dataset.disposition));
 
     // Sort columns based on saved order
     columnOrder.forEach((dispositionKey, index) => {
@@ -189,8 +197,6 @@ function applyColumnOrder() {
             columnsContainer.style.transition = '';
         }, 150);
     }, 50);
-
-    console.log('Column order applied');
 }
 
 // Save column order to localStorage and database
@@ -376,13 +382,14 @@ function updateFilterDisplay() {
         if (isVisible) {
             checkbox.classList.add('checked');
         } else {
+            // Explicitly remove the checked class to ensure it's unchecked
             checkbox.classList.remove('checked');
         }
     });
 }
 
-// Update column visibility based on filters
-function updateColumnVisibility() {
+// Update column visibility based on filters (without database save)
+function updateColumnVisibilityOnly() {
     // Show/hide columns based on filter
     document.querySelectorAll('.disposition-column').forEach(column => {
         const dispositionKey = column.dataset.disposition;
@@ -394,12 +401,6 @@ function updateColumnVisibility() {
             column.style.display = 'none';
         }
     });
-
-    // Save to localStorage for immediate feedback
-    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
-
-    // Save to database via Livewire
-    safeLivewireCall('updateVisibleDispositions', visibleDispositions);
 
     // Update scroll indicator after visibility changes
     setTimeout(() => {
@@ -419,8 +420,14 @@ function toggleDisposition(dispositionKey) {
         visibleDispositions.push(dispositionKey);
     }
 
+    // Save to localStorage immediately for instant persistence
+    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
+
     updateFilterDisplay();
-    updateColumnVisibility();
+    updateColumnVisibilityOnly();
+
+    // Don't save to database automatically - only on panel close or page unload
+    // saveFilterStateToDatabase();
 }
 
 // Select all dispositions
@@ -428,28 +435,161 @@ function selectAllDispositions() {
     visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
         col.dataset.disposition
     );
+
+    // Save to localStorage immediately for instant persistence
+    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
+
     updateFilterDisplay();
-    updateColumnVisibility();
+    updateColumnVisibilityOnly();
+
+    // Don't save to database automatically - only on page unload
+    // saveFilterStateToDatabase();
 }
 
 // Select no dispositions
 function selectNoneDispositions() {
     visibleDispositions = [];
+
+    // Save to localStorage immediately for instant persistence
+    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
+
     updateFilterDisplay();
-    updateColumnVisibility();
+    updateColumnVisibilityOnly();
+
+    // Don't save to database automatically - only on page unload
+    // saveFilterStateToDatabase();
 }
 
-// Toggle filter panel
+// Save filter state to database (delayed, non-blocking)
+function saveFilterStateToDatabase() {
+    // Use a debounced approach to avoid too many database calls
+    if (saveFilterStateToDatabase.timeout) {
+        clearTimeout(saveFilterStateToDatabase.timeout);
+    }
+
+    saveFilterStateToDatabase.timeout = setTimeout(() => {
+        safeLivewireCall('updateVisibleDispositions', visibleDispositions);
+    }, 2000); // Save 2 seconds after last change
+}
+
+// Toggle filter panel - pure client-side, no Livewire needed
 function toggleFilterPanel() {
     const filterOptions = document.getElementById('filter-options');
     const toggleIcon = document.querySelector('.filter-toggle-icon');
 
-    if (filterOptions.classList.contains('hidden')) {
-        filterOptions.classList.remove('hidden');
-        toggleIcon.style.transform = 'rotate(0deg)';
+    // Toggle our client-side state
+    filterPanelOpen = !filterPanelOpen;
+
+    // Update the UI based on our state
+    if (filterPanelOpen) {
+        filterOptions.style.display = 'grid';
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+
+        // Save state to localStorage for persistence
+        localStorage.setItem('leadboard-filter-panel-open', 'true');
     } else {
-        filterOptions.classList.add('hidden');
-        toggleIcon.style.transform = 'rotate(-90deg)';
+        filterOptions.style.display = 'none';
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
+
+        // Save state to localStorage for persistence
+        localStorage.setItem('leadboard-filter-panel-open', 'false');
+
+        // Don't save filter state to database when panel closes - only on page unload
+        // saveFilterStateToDatabase();
+    }
+}
+
+// Initialize filter event listeners
+function initializeFilterEventListeners() {
+    // Simple event delegation approach
+    const filterPanel = document.querySelector('.filter-panel');
+    if (!filterPanel) return;
+
+    // Remove any existing click listener on filter panel
+    filterPanel.removeEventListener('click', handleFilterPanelClick);
+
+    // Add single click listener to filter panel
+    filterPanel.addEventListener('click', handleFilterPanelClick);
+}
+
+// Protect filter state from DOM changes
+function initializeFilterStateProtection() {
+    // Watch for changes to the filter panel that might reset our state
+    const filterPanel = document.querySelector('.filter-panel');
+    if (!filterPanel) return;
+
+    const observer = new MutationObserver(function(mutations) {
+        let shouldRestoreState = false;
+
+        mutations.forEach(function(mutation) {
+            // Check if filter checkboxes were modified
+            if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                const target = mutation.target;
+                if (target.classList && (target.classList.contains('filter-panel') ||
+                    target.classList.contains('filter-options') ||
+                    target.classList.contains('filter-checkbox'))) {
+                    shouldRestoreState = true;
+                }
+            }
+        });
+
+        if (shouldRestoreState) {
+            // Restore filter state after a brief delay
+            setTimeout(() => {
+                updateFilterDisplay();
+                updateColumnVisibilityOnly();
+            }, 10);
+        }
+    });
+
+    // Observe the entire filter panel for changes
+    observer.observe(filterPanel, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class']
+    });
+}
+
+// Handle all filter panel clicks in one place
+function handleFilterPanelClick(e) {
+    const target = e.target;
+
+    // Check if click is on a filter option or its children
+    const filterOption = target.closest('.filter-option');
+    if (filterOption) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const dispositionKey = filterOption.dataset.disposition;
+        toggleDisposition(dispositionKey);
+
+        // No need to worry about panel state - it's managed purely client-side now
+        return;
+    }
+
+    // Check if click is on filter title or its children (but not in filter options area)
+    const filterTitle = target.closest('.filter-title');
+    if (filterTitle) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        toggleFilterPanel();
+        return;
+    }
+
+    // Check if click is on quick action buttons
+    if (target.classList.contains('quick-action-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const buttonText = target.textContent.trim();
+        if (buttonText === 'All') {
+            selectAllDispositions();
+        } else if (buttonText === 'None') {
+            selectNoneDispositions();
+        }
+        return;
     }
 }
 
@@ -471,17 +611,11 @@ document.addEventListener('keydown', function(e) {
 
 // Drag and drop event listeners
 document.addEventListener('dragstart', function(e) {
-    console.log('Drag start detected on:', e.target);
-    console.log('Closest column-drag-handle:', e.target.closest('.column-drag-handle'));
-    console.log('Closest lead-card:', e.target.closest('.lead-card'));
-
     // Check if we're dragging a column (from the drag handle)
     if (e.target.closest('.column-drag-handle')) {
         const column = e.target.closest('.disposition-column');
         draggedColumn = column;
         column.classList.add('column-dragging');
-
-        console.log('Column drag started:', column.dataset.disposition);
 
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', 'column-' + column.dataset.disposition);
@@ -495,11 +629,6 @@ document.addEventListener('dragstart', function(e) {
         draggedLeadId = card.dataset.leadId;
         draggedFromDisposition = card.dataset.currentDisposition;
         card.classList.add('dragging');
-
-        console.log('Lead drag started:', {
-            leadId: draggedLeadId,
-            fromDisposition: draggedFromDisposition
-        });
 
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedLeadId);
@@ -570,25 +699,15 @@ document.addEventListener('dragleave', function(e) {
 
 document.addEventListener('drop', function(e) {
     e.preventDefault();
-    console.log('Drop event detected');
-    console.log('draggedColumn:', draggedColumn);
 
     // Handle column reordering
     if (draggedColumn) {
-        console.log('Handling column drop');
         const targetColumn = e.target.closest('.disposition-column');
-        console.log('Target column:', targetColumn);
 
         if (targetColumn && targetColumn !== draggedColumn) {
             const rect = targetColumn.getBoundingClientRect();
             const midpoint = rect.left + rect.width / 2;
             const isAfter = e.clientX > midpoint;
-
-            console.log('Reordering columns:', {
-                draggedColumn: draggedColumn.dataset.disposition,
-                targetColumn: targetColumn.dataset.disposition,
-                isAfter: isAfter
-            });
 
             const container = document.getElementById('disposition-columns');
             if (isAfter) {
@@ -598,7 +717,6 @@ document.addEventListener('drop', function(e) {
             }
 
             saveColumnOrder();
-            console.log('Column reordered successfully');
         }
         hideDropIndicator();
         return;
@@ -611,80 +729,45 @@ document.addEventListener('drop', function(e) {
 
         const newDisposition = dropZone.dataset.disposition;
 
-        console.log('Drop detected:', {
-            leadId: draggedLeadId,
-            newDisposition,
-            fromDisposition: draggedFromDisposition
-        });
-
         // Don't do anything if dropped in same disposition
         if (newDisposition === draggedFromDisposition) {
-            console.log('Dropped in same disposition, no action needed');
             return;
         }
 
         // Update lead disposition via Livewire
         if (draggedLeadId && newDisposition) {
-            console.log('Calling Livewire method...');
-
             // Use the wire directive to call the method
             safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition);
         }
     }
 });
 
-// Livewire event listeners
-document.addEventListener('livewire:update', function() {
-    console.log('livewire:update event fired');
-    setTimeout(() => {
-        console.log('Livewire update detected, reinitializing...');
-
-        initializeDragAndDrop();
-        initializeFilters();
-    }, 100);
-});
-
-document.addEventListener('livewire:load', function() {
-    console.log('livewire:load event fired');
-});
-
+// Livewire event listeners - only reinitialize drag and drop, filters are pure client-side
 document.addEventListener('livewire:updated', function() {
-    console.log('livewire:updated event fired');
     setTimeout(() => {
-        console.log('Livewire updated detected, reinitializing...');
-
         initializeDragAndDrop();
-        initializeFilters();
+        updateScrollIndicator();
+
+        // Reapply filter states without reinitializing the whole filter system
+        updateFilterDisplay();
+        updateColumnVisibilityOnly();
     }, 100);
 });
-
-// Alpine.js mutations backup
-if (window.Alpine) {
-    window.Alpine.nextTick(() => {
-        console.log('Alpine nextTick after potential Livewire update');
-        setTimeout(() => {
-            const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-                col.dataset.disposition
-            );
-            const savedOrder = localStorage.getItem('leadboard-column-order');
-
-            if (savedOrder) {
-                const parsedOrder = JSON.parse(savedOrder);
-                if (JSON.stringify(currentOrder) !== JSON.stringify(parsedOrder)) {
-                    console.log('Column order mismatch detected, reapplying...');
-                    columnOrder = parsedOrder;
-                    applyColumnOrder();
-                }
-            }
-        }, 200);
-    });
-}
 
 // Window resize listener
 window.addEventListener('resize', function() {
     setTimeout(() => {
         updateScrollIndicator();
     }, 100);
+});
+
+// Save filter state when page unloads
+window.addEventListener('beforeunload', function() {
+    // Clear any pending timeout and save immediately
+    if (saveFilterStateToDatabase.timeout) {
+        clearTimeout(saveFilterStateToDatabase.timeout);
+    }
+    safeLivewireCall('updateVisibleDispositions', visibleDispositions);
 });
 
 // Initialize on page load
@@ -700,55 +783,5 @@ document.addEventListener('DOMContentLoaded', function() {
         columnsContainer.addEventListener('scroll', function() {
             updateScrollNavigation();
         });
-    }
-
-    // Set up MutationObserver to watch for DOM changes
-    const observer = new MutationObserver(function(mutations) {
-        let shouldReinitialize = false;
-
-        mutations.forEach(function(mutation) {
-            // Check if disposition columns were added/removed/changed
-            if (mutation.type === 'childList') {
-                const target = mutation.target;
-                if (target.id === 'disposition-columns' || target.closest('#disposition-columns')) {
-                    console.log('DOM mutation detected in disposition columns');
-                    shouldReinitialize = true;
-                }
-            }
-        });
-
-        if (shouldReinitialize) {
-            setTimeout(() => {
-                console.log('Reinitializing due to DOM mutation...');
-
-                // Check if column order needs to be preserved
-                const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-                    col.dataset.disposition
-                );
-                const savedOrder = localStorage.getItem('leadboard-column-order');
-
-                if (savedOrder) {
-                    const parsedOrder = JSON.parse(savedOrder);
-                    if (JSON.stringify(currentOrder) !== JSON.stringify(parsedOrder)) {
-                        console.log('Column order mismatch after mutation, reapplying...');
-                        columnOrder = parsedOrder;
-                        applyColumnOrder();
-                    }
-                }
-
-                initializeDragAndDrop();
-                updateScrollIndicator();
-            }, 150);
-        }
-    });
-
-    // Start observing
-    const targetNode = document.getElementById('disposition-columns');
-    if (targetNode) {
-        observer.observe(targetNode, {
-            childList: true,
-            subtree: true
-        });
-        console.log('MutationObserver started for disposition columns');
     }
 });
