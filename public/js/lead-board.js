@@ -159,14 +159,14 @@ function restoreColumnOrder() {
         const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
             col.dataset.disposition
         );
-        
+
         columnOrder = window.columnOrderBeforeDrop;
         const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-        
+
         if (needsReordering) {
             applyColumnOrder();
         }
-        
+
         window.columnOrderBeforeDrop = null;
     }
 }
@@ -177,14 +177,14 @@ function initializeColumnOrder() {
         const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
             col.dataset.disposition
         );
-        
+
         columnOrder = window.columnOrderBeforeDrop;
         const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-        
+
         if (needsReordering) {
             applyColumnOrder();
         }
-        
+
         window.columnOrderBeforeDrop = null;
     }
 }
@@ -197,7 +197,7 @@ function applyColumnOrder() {
     const columns = Array.from(columnsContainer.children);
     const currentOrder = columns.map(col => col.dataset.disposition);
     const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-    
+
     if (!needsReordering) {
         return;
     }
@@ -548,11 +548,11 @@ function initializeFilterStateProtection() {
                 // Restore filter selections
                 updateFilterDisplay();
                 updateColumnVisibilityOnly();
-                
+
                 // Restore panel open/closed state
                 const filterOptions = document.getElementById('filter-options');
                 const toggleIcon = document.querySelector('.filter-toggle-icon');
-                
+
                 if (filterPanelOpen) {
                     filterOptions.style.display = 'grid';
                     if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
@@ -762,7 +762,7 @@ document.addEventListener('drop', function(e) {
                 col.dataset.disposition
             );
             window.columnOrderBeforeDrop = currentOrder;
-            
+
             safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition)
                 .then(() => {
                     setTimeout(() => {
@@ -785,7 +785,7 @@ document.addEventListener('livewire:updated', function(event) {
             initializeColumnOrder();
             window.restoreColumnOrderAfterUpdate = false;
         }
-        
+
         initializeDragAndDrop();
         updateScrollIndicator();
         updateFilterDisplay();
