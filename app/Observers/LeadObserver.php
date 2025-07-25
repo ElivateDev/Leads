@@ -28,7 +28,7 @@ class LeadObserver
             try {
                 // Get all notification emails for this client
                 $notificationEmails = $lead->client->getNotificationEmails();
-                
+
                 if (empty($notificationEmails)) {
                     Log::warning('No notification emails configured for client', [
                         'client_id' => $lead->client_id,

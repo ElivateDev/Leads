@@ -13,6 +13,7 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            \App\Filament\Client\Widgets\ImpersonationBanner::class,
             \App\Filament\Client\Widgets\LeadStatsWidget::class,
             \App\Filament\Client\Widgets\RecentLeadsWidget::class,
         ];

@@ -27,6 +27,7 @@ class ClientPanelProvider extends PanelProvider
             ->id('client')
             ->path('client')
             ->login()
+            ->authGuard('web')
             ->brandLogoHeight('2rem')
             ->colors([
                 'primary' => Color::Blue,
@@ -39,6 +40,7 @@ class ClientPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Client/Widgets'), for: 'App\\Filament\\Client\\Widgets')
             ->widgets([
+                \App\Filament\Client\Widgets\ImpersonationBanner::class,
                 \App\Filament\Client\Widgets\LeadStatsWidget::class,
             ])
             ->profile()
@@ -70,6 +72,7 @@ class ClientPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                \App\Http\Middleware\ImpersonationMiddleware::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

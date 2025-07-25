@@ -116,6 +116,13 @@ class UserResource extends Resource
                     ->label('Email verified'),
             ])
             ->actions([
+                Tables\Actions\Action::make('login_as_user')
+                    ->label('Login as User')
+                    ->icon('heroicon-m-arrow-right-on-rectangle')
+                    ->color('warning')
+                    ->visible(fn(User $record): bool => $record->isClient())
+                    ->url(fn(User $record): string => route('impersonate-form', $record))
+                    ->openUrlInNewTab(true),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])

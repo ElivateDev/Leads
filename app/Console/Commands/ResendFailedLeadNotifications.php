@@ -12,7 +12,7 @@ use Carbon\Carbon;
 
 class ResendFailedLeadNotifications extends Command
 {
-    protected $signature = 'leads:resend-notifications 
+    protected $signature = 'leads:resend-notifications
                             {--from= : Start date (Y-m-d H:i:s format)}
                             {--to= : End date (Y-m-d H:i:s format)}
                             {--lead-id= : Specific lead ID to resend}
@@ -44,7 +44,7 @@ class ResendFailedLeadNotifications extends Command
 
         // Find leads to process
         $leadsQuery = Lead::with('client')
-            ->whereHas('client', function($query) {
+            ->whereHas('client', function ($query) {
                 $query->where('email_notifications', true);
             });
 
@@ -65,7 +65,7 @@ class ResendFailedLeadNotifications extends Command
         // Show leads that will be processed
         $this->table(
             ['Lead ID', 'Name', 'Email', 'Created At', 'Client', 'Notification Emails'],
-            $leads->map(function($lead) {
+            $leads->map(function ($lead) {
                 return [
                     $lead->id,
                     $lead->name,
@@ -89,9 +89,9 @@ class ResendFailedLeadNotifications extends Command
 
         foreach ($leads as $lead) {
             $this->info("📤 Processing Lead #{$lead->id}: {$lead->name}");
-            
+
             $notificationEmails = $lead->client->getNotificationEmails();
-            
+
             if (empty($notificationEmails)) {
                 $this->warn("  ⚠️  No notification emails configured for client: {$lead->client->name}");
                 continue;
@@ -99,7 +99,7 @@ class ResendFailedLeadNotifications extends Command
 
             foreach ($notificationEmails as $email) {
                 $totalEmails++;
-                
+
                 if ($dryRun) {
                     $this->line("  📧 Would send to: {$email}");
                     $successCount++;
@@ -180,7 +180,7 @@ class ResendFailedLeadNotifications extends Command
         $this->info("  Total emails processed: {$totalEmails}");
         $this->info("  Successful sends: {$successCount}");
         $this->info("  Failed sends: {$failureCount}");
-        
+
         if ($dryRun) {
             $this->warn('  (This was a dry run - no emails were actually sent)');
         }
@@ -192,9 +192,9 @@ class ResendFailedLeadNotifications extends Command
     {
         return DB::table('failed_jobs')
             ->whereBetween('failed_at', [$from, $to])
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->where('exception', 'like', '%NewLeadNotification%')
-                      ->orWhere('exception', 'like', '%SendQueuedNotifications%');
+                    ->orWhere('exception', 'like', '%SendQueuedNotifications%');
             })
             ->orderBy('failed_at', 'desc')
             ->get();

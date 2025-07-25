@@ -59,6 +59,11 @@ class User extends Authenticatable implements FilamentUser
         }
 
         if ($panel->getId() === 'client') {
+            // If we're impersonating, allow access for client users
+            if (session('is_impersonating') && $this->role === 'client') {
+                return true;
+            }
+
             $isClient = $this->role === 'client' && $this->client_id;
             $isAdmin = $this->role === 'admin' && $this->client_id;
             return $isClient || $isAdmin;

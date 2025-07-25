@@ -18,6 +18,7 @@ A Laravel-based CRM application that automatically processes emails to generate 
     -   **Responsive Design**: Optimized for desktop and mobile with horizontal scrolling support
 -   **Lead Tracking**: Track leads through various stages (new, contacted, qualified, converted, lost)
 -   **Admin Interface**: Modern admin panel built with Filament for easy management
+-   **User Impersonation**: Admins can securely log into the client portal as any client user without password changes, with full audit logging
 -   **Notifications**: Automatic email notifications to clients when new leads are received
 -   **Multiple Lead Sources**: Support for leads from website, phone, referral, social media, and other sources
 
