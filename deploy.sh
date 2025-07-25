@@ -130,6 +130,9 @@ fix_permissions() {
     find "$PROJECT_DIR" -type d -not -path "*/storage/*" -not -path "*/bootstrap/cache/*" -exec chmod 755 {} \;
     find "$PROJECT_DIR" -type f -not -path "*/storage/*" -not -path "*/bootstrap/cache/*" -exec chmod 644 {} \;
 
+    # Make deploy script executable
+    chmod +x "$PROJECT_DIR/deploy.sh"
+
     # Set Laravel-specific permissions for writable directories
     echo "Setting Laravel-specific permissions..."
     chmod -R 775 "$PROJECT_DIR/storage"
