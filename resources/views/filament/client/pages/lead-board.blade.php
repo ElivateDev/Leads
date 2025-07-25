@@ -80,7 +80,7 @@
         </div>
 
         <div class="columns-wrapper">
-            <div class="disposition-columns scroll-indicator" id="disposition-columns">
+            <div class="disposition-columns" id="disposition-columns">
                 @foreach ($dispositions as $dispositionKey => $dispositionLabel)
                     <div class="disposition-column" data-disposition="{{ $dispositionKey }}"
                         id="column-{{ $dispositionKey }}" data-column-order="{{ $loop->index }}">

@@ -242,11 +242,12 @@ function updateScrollIndicator() {
     if (columnsContainer) {
         const hasScroll = columnsContainer.scrollWidth > columnsContainer.clientWidth;
 
-        if (hasScroll) {
-            columnsContainer.classList.add('has-scroll');
-        } else {
-            columnsContainer.classList.remove('has-scroll');
-        }
+        // Disabled scroll indicator classes to prevent fade effect
+        // if (hasScroll) {
+        //     columnsContainer.classList.add('has-scroll');
+        // } else {
+        //     columnsContainer.classList.remove('has-scroll');
+        // }
 
         // Update scroll navigation visibility
         updateScrollNavigation();

@@ -637,32 +637,6 @@
     background: rgb(75 85 99);
 }
 
-.scroll-indicator {
-    position: relative;
-}
-
-.scroll-indicator::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 2rem;
-    background: linear-gradient(to left, rgb(255 255 255), transparent);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: 10;
-}
-
-.dark .scroll-indicator::after {
-    background: linear-gradient(to left, rgb(3 7 18), transparent);
-}
-
-.scroll-indicator.has-scroll::after {
-    opacity: 1;
-}
-
 .columns-wrapper {
     position: relative;
 }
