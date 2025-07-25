@@ -9,6 +9,67 @@ let draggedColumn = null;
 let dropIndicator = null;
 let currentLeadId = null;
 
+// Helper function to safely call Livewire methods
+function safeLivewireCall(method, ...args) {
+    try {
+        if (typeof Livewire === 'undefined' || !Livewire.find) {
+            console.warn('Livewire not available, skipping call to:', method);
+            return false;
+        }
+        
+        const wireElement = document.querySelector('[wire\\:id]');
+        if (!wireElement) {
+            console.warn('No Livewire component found in DOM');
+            return false;
+        }
+        
+        const wireId = wireElement.getAttribute('wire:id');
+        const component = Livewire.find(wireId);
+        
+        if (!component || !component.call) {
+            console.warn('Livewire component not found or method not available');
+            return false;
+        }
+        
+        component.call(method, ...args);
+        return true;
+    } catch (error) {
+        console.warn(`Failed to call Livewire method ${method}:`, error);
+        return false;
+    }
+}
+
+// Wait for Livewire to be ready
+function waitForLivewire(callback, maxAttempts = 50) {
+    let attempts = 0;
+    
+    function checkLivewire() {
+        attempts++;
+        
+        if (typeof Livewire !== 'undefined' && Livewire.find) {
+            const wireElement = document.querySelector('[wire\\:id]');
+            if (wireElement) {
+                const wireId = wireElement.getAttribute('wire:id');
+                const component = Livewire.find(wireId);
+                
+                if (component && component.call) {
+                    callback();
+                    return;
+                }
+            }
+        }
+        
+        if (attempts < maxAttempts) {
+            setTimeout(checkLivewire, 100); // Check every 100ms
+        } else {
+            console.warn('Livewire not ready after maximum attempts, proceeding without it');
+            callback();
+        }
+    }
+    
+    checkLivewire();
+}
+
 // Notes Modal Functions
 function openNotesModal(leadId, leadName, currentNotes) {
     currentLeadId = leadId;
@@ -33,7 +94,7 @@ function saveNotes() {
     const notes = document.getElementById('notes-textarea').value;
 
     // Call Livewire method to save notes
-    window.Livewire.find(window.livewireComponentId).call('updateLeadNotes', currentLeadId, notes);
+    safeLivewireCall('updateLeadNotes', currentLeadId, notes);
 
     closeNotesModal();
 }
@@ -50,39 +111,53 @@ function initializeDragAndDrop() {
 
 // Initialize filter functionality
 function initializeFilters() {
-    // Load visible dispositions from localStorage or set all as default
-    const saved = localStorage.getItem('leadboard-visible-dispositions');
-    if (saved) {
-        visibleDispositions = JSON.parse(saved);
+    // Use initial data from database, fall back to localStorage, then default to all
+    if (window.initialVisibleDispositions) {
+        visibleDispositions = window.initialVisibleDispositions;
     } else {
-        // Default to all dispositions visible
-        visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
+        const saved = localStorage.getItem('leadboard-visible-dispositions');
+        if (saved) {
+            visibleDispositions = JSON.parse(saved);
+        } else {
+            // Default to all dispositions visible
+            visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+                col.dataset.disposition
+            );
+        }
     }
 
-    // Load column order from localStorage
+    // Load column order from database or localStorage
     initializeColumnOrder();
 
+    // Wait for Livewire before making database calls
+    waitForLivewire(function() {
+        updateColumnVisibility();
+    });
+    
     updateFilterDisplay();
-    updateColumnVisibility();
     updateScrollIndicator();
 }
 
 // Initialize column ordering
 function initializeColumnOrder() {
-    const savedOrder = localStorage.getItem('leadboard-column-order');
-    if (savedOrder) {
-        columnOrder = JSON.parse(savedOrder);
-        console.log('Loaded saved column order:', columnOrder);
-        // Apply the saved order
+    // Use initial data from database, fall back to localStorage, then default order
+    if (window.initialColumnOrder) {
+        columnOrder = window.initialColumnOrder;
+        console.log('Loaded column order from database:', columnOrder);
         applyColumnOrder();
     } else {
-        // Default order based on current DOM order
-        columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
-        console.log('Using default column order:', columnOrder);
+        const savedOrder = localStorage.getItem('leadboard-column-order');
+        if (savedOrder) {
+            columnOrder = JSON.parse(savedOrder);
+            console.log('Loaded saved column order from localStorage:', columnOrder);
+            applyColumnOrder();
+        } else {
+            // Default order based on current DOM order
+            columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
+                col.dataset.disposition
+            );
+            console.log('Using default column order:', columnOrder);
+        }
     }
 }
 
@@ -118,11 +193,17 @@ function applyColumnOrder() {
     console.log('Column order applied');
 }
 
-// Save column order to localStorage
+// Save column order to localStorage and database
+// Save column order to localStorage and database
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
     columnOrder = columns.map(col => col.dataset.disposition);
+    
+    // Save to localStorage for immediate feedback
     localStorage.setItem('leadboard-column-order', JSON.stringify(columnOrder));
+    
+    // Save to database via Livewire
+    safeLivewireCall('updateColumnOrder', columnOrder);
 }
 
 // Show drop indicator for column reordering
@@ -314,8 +395,11 @@ function updateColumnVisibility() {
         }
     });
 
-    // Save to localStorage
+    // Save to localStorage for immediate feedback
     localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
+    
+    // Save to database via Livewire
+    safeLivewireCall('updateVisibleDispositions', visibleDispositions);
 
     // Update scroll indicator after visibility changes
     setTimeout(() => {
@@ -544,8 +628,7 @@ document.addEventListener('drop', function(e) {
             console.log('Calling Livewire method...');
 
             // Use the wire directive to call the method
-            window.Livewire.find(window.livewireComponentId).call('updateLeadDisposition', draggedLeadId,
-                newDisposition);
+            safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition);
         }
     }
 });
@@ -607,6 +690,8 @@ window.addEventListener('resize', function() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
+    
+    // Initialize filters (this will wait for Livewire for database calls)
     initializeFilters();
 
     // Add scroll listener to columns container

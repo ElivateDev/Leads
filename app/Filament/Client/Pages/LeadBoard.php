@@ -3,6 +3,7 @@
 namespace App\Filament\Client\Pages;
 
 use App\Models\Lead;
+use App\Models\UserPreference;
 use Filament\Pages\Page;
 use Filament\Facades\Filament;
 use Livewire\Attributes\On;
@@ -28,8 +29,16 @@ class LeadBoard extends Page
     {
         $this->loadData();
 
-        // Initialize visible dispositions to all by default
-        $this->visibleDispositions = array_keys($this->dispositions);
+        // Load user preferences for visible dispositions
+        $user = Filament::auth()->user();
+        $savedVisibleDispositions = $user->getPreference('leadboard_visible_dispositions');
+        
+        if ($savedVisibleDispositions) {
+            $this->visibleDispositions = array_intersect($savedVisibleDispositions, array_keys($this->dispositions));
+        } else {
+            // Initialize visible dispositions to all by default
+            $this->visibleDispositions = array_keys($this->dispositions);
+        }
     }
 
     protected function loadData(): void
@@ -119,5 +128,22 @@ class LeadBoard extends Page
     public function updateVisibleDispositions($visibleDispositions): void
     {
         $this->visibleDispositions = array_intersect($visibleDispositions, array_keys($this->dispositions));
+        
+        // Save to user preferences
+        $user = Filament::auth()->user();
+        $user->setPreference('leadboard_visible_dispositions', $this->visibleDispositions);
+    }
+
+    public function updateColumnOrder($columnOrder): void
+    {
+        // Save column order to user preferences
+        $user = Filament::auth()->user();
+        $user->setPreference('leadboard_column_order', $columnOrder);
+    }
+
+    public function getColumnOrder(): array
+    {
+        $user = Filament::auth()->user();
+        return $user->getPreference('leadboard_column_order', array_keys($this->dispositions));
     }
 }

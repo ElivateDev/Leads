@@ -208,6 +208,12 @@
         <script>
             // Make Livewire component ID available to external script
             window.livewireComponentId = '{{ $_instance->getId() }}';
+            
+            // Pass initial column order from database
+            window.initialColumnOrder = @json($this->getColumnOrder());
+            
+            // Pass initial visible dispositions
+            window.initialVisibleDispositions = @json($visibleDispositions);
         </script>
         <script src="{{ asset('js/lead-board.js') }}"></script>
     @endpush

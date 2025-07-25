@@ -76,6 +76,30 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Get the user's preferences
+     */
+    public function preferences()
+    {
+        return $this->hasMany(UserPreference::class);
+    }
+
+    /**
+     * Get a specific preference value
+     */
+    public function getPreference(string $key, mixed $default = null): mixed
+    {
+        return UserPreference::getValue($this->id, $key, $default);
+    }
+
+    /**
+     * Set a specific preference value
+     */
+    public function setPreference(string $key, mixed $value): void
+    {
+        UserPreference::setValue($this->id, $key, $value);
+    }
+
+    /**
      * Check if user is an admin
      */
     public function isAdmin(): bool
