@@ -10,6 +10,12 @@ A Laravel-based CRM application that automatically processes emails to generate 
     -   **Email Match Rules**: Route emails based on sender address or domain
     -   **Custom Body Text Rules**: Route emails based on content patterns in the email body (e.g., "Source: Facebook AND rep: henry")
     -   **Combined Rules**: Route emails that match BOTH email pattern AND body text conditions
+-   **Interactive Kanban Board**: Visual lead management with drag-and-drop functionality:
+    -   **Real-time Lead Organization**: Drag leads between disposition columns (new, contacted, qualified, etc.)
+    -   **Customizable Columns**: Show/hide disposition columns based on your workflow
+    -   **Persistent User Preferences**: Column order and visibility settings saved per user across devices
+    -   **Lead Notes**: Quick access to add and edit lead notes directly from the board
+    -   **Responsive Design**: Optimized for desktop and mobile with horizontal scrolling support
 -   **Lead Tracking**: Track leads through various stages (new, contacted, qualified, converted, lost)
 -   **Admin Interface**: Modern admin panel built with Filament for easy management
 -   **Notifications**: Automatic email notifications to clients when new leads are received
@@ -19,9 +25,10 @@ A Laravel-based CRM application that automatically processes emails to generate 
 
 -   **Backend**: Laravel 12.x (PHP 8.2+)
 -   **Admin Panel**: Filament 3.x
+-   **Real-time Updates**: Livewire for dynamic UI interactions
 -   **Database**: configurable
 -   **Email Processing**: PHP-IMAP, Mail-MIME-Parser
--   **Frontend**: Vite + TailwindCSS
+-   **Frontend**: Vite + TailwindCSS + Custom JavaScript (drag-and-drop, user preferences)
 -   **Testing**: Pest PHP
 
 ## Installation
@@ -138,6 +145,48 @@ Or set up a cron job for automatic processing:
 ```
 
 ### Managing Data
+
+#### Lead Board (Kanban View)
+
+The Lead Board provides an interactive kanban-style interface for managing leads visually:
+
+**Key Features:**
+
+-   **Drag & Drop**: Move leads between disposition columns by dragging lead cards
+-   **Column Management**:
+    -   Reorder columns by dragging column headers
+    -   Show/hide columns using the filter panel
+    -   Column order and visibility preferences are saved per user
+-   **Lead Interaction**:
+    -   Click on any lead card to quickly add or edit notes
+    -   Lead information displays contact details, source, and current status
+    -   Real-time updates when leads are moved between dispositions
+
+**Available Dispositions:**
+
+-   **New**: Freshly received leads awaiting initial contact
+-   **Contacted (Attempt 1-3)**: Leads with ongoing contact attempts
+-   **Qualified**: Leads that meet your criteria and show interest
+-   **Scheduled**: Leads with scheduled appointments or follow-ups
+-   **Completed**: Successfully closed leads
+-   **Warm**: Interested leads for future follow-up
+-   **Signed**: Leads that have converted to customers
+-   **Lost**: Leads that didn't convert
+-   **No Show**: Leads that missed scheduled appointments
+-   **Spam**: Invalid or unwanted leads
+-   **Recycled**: Leads being given another opportunity
+
+**User Preferences:**
+
+-   Column order and visibility settings are automatically saved to your user profile
+-   Preferences sync across devices and browser sessions
+-   Local storage provides immediate feedback while database sync happens in the background
+
+**Navigation:**
+
+-   Access the Lead Board from the main navigation menu
+-   Use horizontal scroll navigation for viewing many columns on smaller screens
+-   Filter controls allow quick showing/hiding of disposition columns
 
 #### Clients
 
@@ -308,6 +357,13 @@ Result: Selective distribution based on email content
 -   Email-to-client mapping system
 -   Support for multiple emails per client
 -   Active/inactive status for mappings
+
+### User Preferences
+
+-   Per-user settings storage for kanban board customization
+-   JSON-based preference values for flexible data storage
+-   Tracks column order, visibility settings, and other UI preferences
+-   Unique constraints to ensure one preference per key per user
 
 ## Architecture
 

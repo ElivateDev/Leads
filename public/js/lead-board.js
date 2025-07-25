@@ -16,21 +16,21 @@ function safeLivewireCall(method, ...args) {
             console.warn('Livewire not available, skipping call to:', method);
             return false;
         }
-        
+
         const wireElement = document.querySelector('[wire\\:id]');
         if (!wireElement) {
             console.warn('No Livewire component found in DOM');
             return false;
         }
-        
+
         const wireId = wireElement.getAttribute('wire:id');
         const component = Livewire.find(wireId);
-        
+
         if (!component || !component.call) {
             console.warn('Livewire component not found or method not available');
             return false;
         }
-        
+
         component.call(method, ...args);
         return true;
     } catch (error) {
@@ -42,23 +42,23 @@ function safeLivewireCall(method, ...args) {
 // Wait for Livewire to be ready
 function waitForLivewire(callback, maxAttempts = 50) {
     let attempts = 0;
-    
+
     function checkLivewire() {
         attempts++;
-        
+
         if (typeof Livewire !== 'undefined' && Livewire.find) {
             const wireElement = document.querySelector('[wire\\:id]');
             if (wireElement) {
                 const wireId = wireElement.getAttribute('wire:id');
                 const component = Livewire.find(wireId);
-                
+
                 if (component && component.call) {
                     callback();
                     return;
                 }
             }
         }
-        
+
         if (attempts < maxAttempts) {
             setTimeout(checkLivewire, 100); // Check every 100ms
         } else {
@@ -66,7 +66,7 @@ function waitForLivewire(callback, maxAttempts = 50) {
             callback();
         }
     }
-    
+
     checkLivewire();
 }
 
@@ -133,7 +133,7 @@ function initializeFilters() {
     waitForLivewire(function() {
         updateColumnVisibility();
     });
-    
+
     updateFilterDisplay();
     updateScrollIndicator();
 }
@@ -198,10 +198,10 @@ function applyColumnOrder() {
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
     columnOrder = columns.map(col => col.dataset.disposition);
-    
+
     // Save to localStorage for immediate feedback
     localStorage.setItem('leadboard-column-order', JSON.stringify(columnOrder));
-    
+
     // Save to database via Livewire
     safeLivewireCall('updateColumnOrder', columnOrder);
 }
@@ -397,7 +397,7 @@ function updateColumnVisibility() {
 
     // Save to localStorage for immediate feedback
     localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
-    
+
     // Save to database via Livewire
     safeLivewireCall('updateVisibleDispositions', visibleDispositions);
 
@@ -690,7 +690,7 @@ window.addEventListener('resize', function() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
-    
+
     // Initialize filters (this will wait for Livewire for database calls)
     initializeFilters();
 

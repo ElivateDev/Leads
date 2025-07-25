@@ -32,7 +32,7 @@ class LeadBoard extends Page
         // Load user preferences for visible dispositions
         $user = Filament::auth()->user();
         $savedVisibleDispositions = $user->getPreference('leadboard_visible_dispositions');
-        
+
         if ($savedVisibleDispositions) {
             $this->visibleDispositions = array_intersect($savedVisibleDispositions, array_keys($this->dispositions));
         } else {
@@ -128,7 +128,7 @@ class LeadBoard extends Page
     public function updateVisibleDispositions($visibleDispositions): void
     {
         $this->visibleDispositions = array_intersect($visibleDispositions, array_keys($this->dispositions));
-        
+
         // Save to user preferences
         $user = Filament::auth()->user();
         $user->setPreference('leadboard_visible_dispositions', $this->visibleDispositions);
