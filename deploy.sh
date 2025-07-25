@@ -1,5 +1,5 @@
 #!/bin/bash
-# /root/scripts/deploy-leads-optimized.sh
+# deploy.sh
 # Usage:
 #   ./deploy.sh                   - Full deployment check and deploy if needed
 #   ./deploy.sh --fix-permissions - Only fix file permissions and ownership
@@ -137,13 +137,9 @@ fix_permissions() {
 
     # Fix ownership for Laravel directories (this is critical for web server access)
     echo "Setting ownership for Laravel directories..."
-    # Option 1: Web server ownership (most secure)
+
     chown -R "$LARAVEL_USER:$LARAVEL_GROUP" "$PROJECT_DIR/storage"
     chown -R "$LARAVEL_USER:$LARAVEL_GROUP" "$PROJECT_DIR/bootstrap/cache"
-
-    # Option 2: Root ownership with group access (if you prefer root ownership)
-    # chown -R root:"$LARAVEL_GROUP" "$PROJECT_DIR/storage"
-    # chown -R root:"$LARAVEL_GROUP" "$PROJECT_DIR/bootstrap/cache"
 
     # Ensure group write permissions (redundant but explicit)
     chmod -R g+w "$PROJECT_DIR/storage"

@@ -74,6 +74,9 @@ class LeadResource extends Resource
                         'other' => 'Other',
                     ])
                     ->disabled(),
+                Forms\Components\TextInput::make('campaign')
+                    ->label('Campaign')
+                    ->disabled(),
                 Forms\Components\DateTimePicker::make('email_received_at')
                     ->label('Received At')
                     ->disabled(),
@@ -152,6 +155,12 @@ class LeadResource extends Resource
                                     'phone' => 'heroicon-m-phone',
                                     default => 'heroicon-m-question-mark-circle',
                                 }),
+                            Tables\Columns\TextColumn::make('campaign')
+                                ->badge()
+                                ->color('info')
+                                ->placeholder('No campaign')
+                                ->icon('heroicon-m-tag')
+                                ->visible(fn($record): bool => !empty($record->campaign)),
                         ])->space(1)->alignment('end'),
                     ]),
 
@@ -212,6 +221,10 @@ class LeadResource extends Resource
                     ])
                     ->multiple()
                     ->placeholder('All Sources'),
+                Tables\Filters\Filter::make('has_campaign')
+                    ->query(fn(Builder $query): Builder => $query->whereNotNull('campaign')->where('campaign', '!=', ''))
+                    ->label('Has campaign')
+                    ->indicator('Has campaign'),
                 Tables\Filters\Filter::make('recent')
                     ->query(fn(Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
                     ->label('Last 7 days')
@@ -334,7 +347,8 @@ class LeadResource extends Resource
 
     protected static function formatPhoneNumber(?string $phone): string
     {
-        if (!$phone) return 'No phone provided';
+        if (!$phone)
+            return 'No phone provided';
 
         // Simple US phone number formatting
         $cleaned = preg_replace('/[^0-9]/', '', $phone);

@@ -56,6 +56,14 @@ class LeadsRelationManager extends RelationManager
                     ])
                     ->required()
                     ->default('website'),
+                Forms\Components\TextInput::make('campaign')
+                    ->label('Campaign')
+                    ->helperText('Optional campaign identifier for tracking lead sources')
+                    ->maxLength(255),
+                Forms\Components\TextInput::make('campaign')
+                    ->label('Campaign')
+                    ->helperText('Optional campaign identifier for tracking lead sources')
+                    ->maxLength(255),
             ]);
     }
 
@@ -95,6 +103,11 @@ class LeadsRelationManager extends RelationManager
                         'social' => 'danger',
                         'other' => 'gray',
                     }),
+                Tables\Columns\TextColumn::make('campaign')
+                    ->placeholder('No campaign')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

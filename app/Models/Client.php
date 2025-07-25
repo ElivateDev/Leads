@@ -37,6 +37,11 @@ class Client extends Model
         return $this->hasMany(ClientEmail::class);
     }
 
+    public function campaignRules(): HasMany
+    {
+        return $this->hasMany(CampaignRule::class);
+    }
+
     /**
      * Get the default lead dispositions
      */
@@ -77,7 +82,7 @@ class Client extends Model
         if (!empty($this->notification_emails)) {
             return $this->notification_emails;
         }
-        
+
         // Otherwise, fall back to the primary email
         return $this->email ? [$this->email] : [];
     }
@@ -91,7 +96,7 @@ class Client extends Model
         $filtered = array_values(array_filter($emails, function ($email) {
             return !empty(trim($email));
         }));
-        
+
         $this->notification_emails = empty($filtered) ? null : $filtered;
         $this->save();
     }

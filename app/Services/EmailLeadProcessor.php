@@ -339,6 +339,10 @@ class EmailLeadProcessor
         $source = $this->determineLeadSource($email);
         echo "  - Source: $source\n";
 
+        // Determine campaign from email content
+        $campaign = $this->determineCampaign($email);
+        echo "  - Campaign: " . ($campaign ?: 'none detected') . "\n";
+
         // Find all matching clients instead of just the first one
         $clients = $this->findAllMatchingClients($email);
 
@@ -397,6 +401,7 @@ class EmailLeadProcessor
                 'message' => $message,
                 'status' => 'new',
                 'source' => $source,
+                'campaign' => $campaign,
                 'from_email' => $senderEmail,
                 'email_subject' => $email->subject,
                 'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
@@ -413,6 +418,7 @@ class EmailLeadProcessor
                     'extracted_phone' => $phoneNumber,
                     'message_length' => strlen($message),
                     'source' => $source,
+                    'campaign' => $campaign,
                     'client_name' => $client->name,
                 ]
             );
@@ -880,5 +886,63 @@ class EmailLeadProcessor
             return $matches[0];
         }
         return $email->fromAddress ?? '';
+    }
+
+    /**
+     * Determine campaign from email content using campaign rules
+     * @param mixed $email
+     * @return string|null
+     */
+    private function determineCampaign($email): ?string
+    {
+        // Get all active campaign rules, ordered by priority (highest first)
+        $campaignRules = \App\Models\CampaignRule::where('is_active', true)
+            ->orderBy('priority', 'desc')
+            ->orderBy('id', 'asc') // Secondary sort for consistency
+            ->get();
+
+        foreach ($campaignRules as $rule) {
+            if ($rule->matchesEmail($email)) {
+                Log::info('Campaign rule matched', [
+                    'rule_id' => $rule->id,
+                    'campaign_name' => $rule->campaign_name,
+                    'rule_type' => $rule->rule_type,
+                    'rule_value' => $rule->rule_value,
+                    'match_field' => $rule->match_field,
+                ]);
+                return $rule->campaign_name;
+            }
+        }
+
+        // Try to extract campaign from Google Ads URL parameters as fallback
+        $googleAdsCampaign = $this->extractGoogleAdsCampaign($email);
+        if ($googleAdsCampaign) {
+            Log::info('Google Ads campaign detected', ['campaign_id' => $googleAdsCampaign]);
+            return "Google Ads #{$googleAdsCampaign}";
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract Google Ads campaign ID from URL parameters as fallback
+     * @param mixed $email
+     * @return string|null
+     */
+    private function extractGoogleAdsCampaign($email): ?string
+    {
+        $text = $email->textPlain ?? '';
+
+        // Look for gad_campaignid parameter
+        if (preg_match('/gad_campaignid=(\d+)/i', $text, $matches)) {
+            return $matches[1];
+        }
+
+        // Look for other common Google Ads parameters
+        if (preg_match('/utm_campaign=([^&\s]+)/i', $text, $matches)) {
+            return urldecode($matches[1]);
+        }
+
+        return null;
     }
 }

@@ -19,6 +19,9 @@ class LeadResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
+    protected static ?string $navigationGroup = 'Lead Management';
+
+
     public static function form(Form $form): Form
     {
         return $form
@@ -63,6 +66,10 @@ class LeadResource extends Resource
                         'other' => 'Other',
                     ])
                     ->default('website'),
+                Forms\Components\TextInput::make('campaign')
+                    ->label('Campaign')
+                    ->helperText('Optional campaign identifier for tracking lead sources')
+                    ->maxLength(255),
             ]);
     }
 
@@ -117,6 +124,11 @@ class LeadResource extends Resource
                         'social' => 'danger',
                         'other' => 'gray',
                     }),
+                Tables\Columns\TextColumn::make('campaign')
+                    ->placeholder('No campaign')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

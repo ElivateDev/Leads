@@ -12,7 +12,7 @@ class RecentLeadsWidget extends BaseWidget
 {
     protected static ?string $heading = 'Recent Leads';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -47,6 +47,11 @@ class RecentLeadsWidget extends BaseWidget
                         $dispositions = $client ? $client->getLeadDispositions() : \App\Models\Client::getDefaultDispositions();
                         return $dispositions[$state] ?? ucfirst($state);
                     }),
+                Tables\Columns\TextColumn::make('campaign')
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('No campaign')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->since()
                     ->sortable(),

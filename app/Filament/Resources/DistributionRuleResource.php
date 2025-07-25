@@ -25,6 +25,9 @@ class DistributionRuleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Distribution Rules';
 
+    protected static ?string $navigationGroup = 'Lead Management';
+
+
     public static function form(Form $form): Form
     {
         return $form

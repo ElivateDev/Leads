@@ -152,6 +152,14 @@
                                         @if ($lead['source'])
                                             <span class="lead-source">{{ $lead['source'] }}</span>
                                         @endif
+                                        @if ($lead['campaign'])
+                                            <span class="lead-campaign" style="background-color: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.25rem;">
+                                                <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                                                </svg>
+                                                {{ $lead['campaign'] }}
+                                            </span>
+                                        @endif
                                         @if ($lead['created_at'])
                                             <div class="lead-info" style="margin-top: 0.5rem; font-size: 0.75rem;">
                                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

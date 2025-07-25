@@ -25,6 +25,7 @@ class Lead extends Model
         'email_received_at',
         'status',
         'source',
+        'campaign',
     ];
 
     public function client(): BelongsTo
@@ -44,6 +45,7 @@ class Lead extends Model
             'status' => 'required|string',
             'from_email' => 'nullable|email',
             'source' => 'required|in:website,phone,referral,social,other',
+            'campaign' => 'nullable|string|max:255',
             'client_id' => 'required|exists:clients,id',
         ];
     }
