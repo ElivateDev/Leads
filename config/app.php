@@ -123,4 +123,24 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Configure default settings for admin notifications about email processing.
+    | Individual admin users can override these settings in their preferences.
+    |
+    */
+
+    'admin_notifications' => [
+        'email_processed' => env('ADMIN_NOTIFY_EMAIL_PROCESSED', false),
+        'errors' => env('ADMIN_NOTIFY_ERRORS', true),
+        'rules_not_matched' => env('ADMIN_NOTIFY_RULES_NOT_MATCHED', false),
+        'duplicate_leads' => env('ADMIN_NOTIFY_DUPLICATE_LEADS', false),
+        'high_email_volume' => env('ADMIN_NOTIFY_HIGH_EMAIL_VOLUME', false),
+        'imap_connection_issues' => env('ADMIN_NOTIFY_IMAP_CONNECTION_ISSUES', true),
+        'smtp_issues' => env('ADMIN_NOTIFY_SMTP_ISSUES', true),
+    ],
+
 ];

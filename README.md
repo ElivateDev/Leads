@@ -18,6 +18,12 @@ A Laravel-based CRM application that automatically processes emails to generate 
     -   **Responsive Design**: Optimized for desktop and mobile with horizontal scrolling support
 -   **Lead Tracking**: Track leads through various stages (new, contacted, qualified, converted, lost)
 -   **Admin Interface**: Modern admin panel built with Filament for easy management
+-   **Admin Notifications**: Configurable email notifications for administrators about system events:
+    -   Email processing success/failure notifications
+    -   Error alerts for SMTP, IMAP, and processing issues  
+    -   Alerts when no client rules match incoming emails
+    -   Duplicate lead detection notifications
+    -   Individual notification preferences per admin user
 -   **User Impersonation**: Admins can securely log into the client portal as any client user without password changes, with full audit logging
 -   **Notifications**: Automatic email notifications to clients when new leads are received
 -   **Multiple Lead Sources**: Support for leads from website, phone, referral, social media, and other sources
@@ -129,6 +135,22 @@ Set a default client ID for unmatched emails:
 DEFAULT_CLIENT_ID=1
 ```
 
+### Admin Notifications
+
+Configure default admin notification settings:
+
+```env
+# Admin notification defaults (individual admins can override these)
+ADMIN_NOTIFY_EMAIL_PROCESSED=false
+ADMIN_NOTIFY_ERRORS=true
+ADMIN_NOTIFY_RULES_NOT_MATCHED=false
+ADMIN_NOTIFY_DUPLICATE_LEADS=false
+ADMIN_NOTIFY_IMAP_CONNECTION_ISSUES=true
+ADMIN_NOTIFY_SMTP_ISSUES=true
+```
+
+Individual admin users can customize their notification preferences through **Administration > Admin Settings** in the admin panel.
+
 ## Usage
 
 ### Email Processing
@@ -143,6 +165,21 @@ Or set up a cron job for automatic processing:
 
 ```bash
 * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### Admin Notifications Testing
+
+Test admin notification settings:
+
+```bash
+# Test all notification types for all admins
+php artisan admin:test-notifications
+
+# Test specific notification type
+php artisan admin:test-notifications --type=error
+
+# Test notifications for specific admin
+php artisan admin:test-notifications --admin-email=admin@example.com
 ```
 
 ### Managing Data

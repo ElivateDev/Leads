@@ -11,6 +11,7 @@ use TheIconic\NameParser\Parser;
 use Illuminate\Support\Facades\Log;
 use League\HTMLToMarkdown\HtmlConverter;
 use App\Services\EmailProcessingLogger;
+use App\Services\AdminNotificationService;
 
 class EmailLeadProcessor
 {
@@ -168,6 +169,29 @@ class EmailLeadProcessor
                         'trace' => $e->getTraceAsString()
                     ]);
                     echo "✗ Error processing email ID $mailId: " . $e->getMessage() . "\n";
+                    
+                    // Send admin notification for email processing error
+                    $fromAddress = 'unknown';
+                    $subject = 'Unknown Subject';
+                    try {
+                        if (isset($email)) {
+                            $fromAddress = $email->fromAddress ?? 'unknown';
+                            $subject = $email->subject ?? 'Unknown Subject';
+                        }
+                    } catch (\Exception $innerE) {
+                        // Ignore errors when trying to extract email info
+                    }
+                    
+                    AdminNotificationService::notifyEmailError(
+                        $fromAddress,
+                        $subject,
+                        $e->getMessage(),
+                        'email_processing_error',
+                        [
+                            'mail_id' => $mailId,
+                            'exception_class' => get_class($e),
+                        ]
+                    );
                 }
             }
 
@@ -297,6 +321,16 @@ class EmailLeadProcessor
         if (!$leadName) {
             echo "  ✗ No lead name extracted, skipping\n";
             Log::warning('Email without lead name, skipping');
+            
+            // Send admin notification for processing error
+            AdminNotificationService::notifyEmailError(
+                $senderEmail,
+                $email->subject ?? 'No Subject',
+                'No lead name could be extracted from email',
+                'name_extraction_error',
+                ['email_body_preview' => substr($email->textPlain ?? '', 0, 200)]
+            );
+            
             EmailProcessingLogger::logError(
                 $senderEmail,
                 'No lead name could be extracted from email',
@@ -309,6 +343,15 @@ class EmailLeadProcessor
         if (!$senderEmail) {
             echo "  ✗ No sender email, skipping\n";
             Log::warning('Email without sender address, skipping');
+            
+            // Send admin notification for processing error
+            AdminNotificationService::notifyEmailError(
+                'unknown',
+                $email->subject ?? 'No Subject',
+                'Email without sender address',
+                'sender_email_missing'
+            );
+            
             EmailProcessingLogger::logError(
                 'unknown',
                 'Email without sender address'
@@ -345,24 +388,49 @@ class EmailLeadProcessor
 
         // Find all matching clients instead of just the first one
         $clients = $this->findAllMatchingClients($email);
+        $usedDefaultClient = false;
 
         // If no matching clients found, try default client
         if ($clients->isEmpty()) {
             $defaultClient = $this->getDefaultClient();
             if ($defaultClient) {
                 $clients = collect([$defaultClient]);
+                $usedDefaultClient = true;
+                
+                $domain = explode('@', $senderEmail)[1] ?? '';
+                
+                // Send admin notification for unmatched rules using default client
+                AdminNotificationService::notifyRuleNotMatched(
+                    $senderEmail,
+                    $email->subject ?? 'No Subject',
+                    $domain,
+                    true,
+                    $defaultClient->name
+                );
             }
         }
 
         if ($clients->isEmpty()) {
             echo "  ✗ No client found and no default client set\n";
             Log::error('No client found and no default client set');
+            
+            $domain = explode('@', $senderEmail)[1] ?? '';
+            
+            // Send admin notification for unmatched rules
+            AdminNotificationService::notifyRuleNotMatched(
+                $senderEmail,
+                $email->subject ?? 'No Subject',
+                $domain,
+                false,
+                null
+            );
+            
             EmailProcessingLogger::logError(
                 $senderEmail,
                 'No client found and no default client configured',
                 null,
                 [
-                    'sender_domain' => explode('@', $senderEmail)[1] ?? '',
+                    'sender_domain' => $domain,
                     'subject' => $email->subject,
                 ]
             );
@@ -402,6 +470,21 @@ class EmailLeadProcessor
                         'lead_email' => $leadEmail,
                     ],
                     $duplicateLead
+                );
+
+                // Send admin notification for duplicate lead
+                AdminNotificationService::notifyDuplicateLead(
+                    $senderEmail,
+                    $email->subject ?? 'No Subject',
+                    $duplicateLead,
+                    $client->name,
+                    [
+                        'duplicate_detection_method' => 'name_email_phone_match',
+                        'phone_number' => $phoneNumber,
+                        'lead_name' => $leadName,
+                        'lead_email' => $leadEmail,
+                        'time_since_original' => $duplicateLead->created_at->diffForHumans(),
+                    ]
                 );
 
                 $leads[] = $updatedLead;
@@ -447,6 +530,32 @@ class EmailLeadProcessor
 
         if (!empty($leads)) {
             echo "  ✓ Created " . count($leads) . " lead(s) for " . count($clients) . " client(s)\n";
+            
+            // Send admin notification for successful email processing
+            $matchedClientsData = $clients->map(function ($client) {
+                return [
+                    'id' => $client->id,
+                    'name' => $client->name,
+                    'email' => $client->email,
+                ];
+            })->toArray();
+            
+            $createdLeadsData = collect($leads)->map(function ($lead) {
+                return [
+                    'id' => $lead->id,
+                    'name' => $lead->name,
+                    'client_name' => $lead->client->name,
+                ];
+            })->toArray();
+            
+            AdminNotificationService::notifyEmailProcessed(
+                $senderEmail,
+                $email->subject ?? 'No Subject',
+                $matchedClientsData,
+                $createdLeadsData,
+                $source,
+                $campaign
+            );
         }
 
         return $leads;

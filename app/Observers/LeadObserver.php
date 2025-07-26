@@ -6,6 +6,7 @@ use App\Models\Lead;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\NewLeadNotification;
 use App\Services\EmailProcessingLogger;
+use App\Services\AdminNotificationService;
 
 class LeadObserver
 {
@@ -159,6 +160,21 @@ class LeadObserver
                     ]
                 ]);
 
+                // Send admin notification for SMTP transport error
+                AdminNotificationService::notifyEmailError(
+                    $lead->from_email ?? $lead->email ?? 'unknown',
+                    'Lead #' . $lead->id . ' - ' . $lead->name,
+                    'SMTP Transport Error: ' . $e->getMessage(),
+                    'smtp_transport_error',
+                    [
+                        'lead_id' => $lead->id,
+                        'client_name' => $lead->client->name,
+                        'recipient_email' => $lead->client->email,
+                        'smtp_host' => config('mail.mailers.smtp.host'),
+                        'smtp_port' => config('mail.mailers.smtp.port'),
+                    ]
+                );
+
                 EmailProcessingLogger::logError(
                     $lead->from_email ?? $lead->email ?? 'unknown',
                     'SMTP Transport Error: ' . $e->getMessage(),
@@ -176,6 +192,19 @@ class LeadObserver
                     'error' => $e->getMessage(),
                     'recipient' => $lead->client->email,
                 ]);
+
+                // Send admin notification for RFC compliance error
+                AdminNotificationService::notifyEmailError(
+                    $lead->from_email ?? $lead->email ?? 'unknown',
+                    'Lead #' . $lead->id . ' - ' . $lead->name,
+                    'Email RFC Compliance Error: ' . $e->getMessage(),
+                    'rfc_compliance_error',
+                    [
+                        'lead_id' => $lead->id,
+                        'client_name' => $lead->client->name,
+                        'recipient_email' => $lead->client->email,
+                    ]
+                );
 
                 EmailProcessingLogger::logError(
                     $lead->from_email ?? $lead->email ?? 'unknown',
@@ -197,6 +226,21 @@ class LeadObserver
                     'recipient' => $lead->client->email,
                     'lead_id' => $lead->id,
                 ]);
+
+                // Send admin notification for general email error
+                AdminNotificationService::notifyEmailError(
+                    $lead->from_email ?? $lead->email ?? 'unknown',
+                    'Lead #' . $lead->id . ' - ' . $lead->name,
+                    'Failed to send new lead notification: ' . $e->getMessage(),
+                    'general_email_error',
+                    [
+                        'lead_id' => $lead->id,
+                        'client_name' => $lead->client->name,
+                        'recipient_email' => $lead->client->email,
+                        'exception_class' => get_class($e),
+                        'notification_class' => NewLeadNotification::class,
+                    ]
+                );
 
                 EmailProcessingLogger::logError(
                     $lead->from_email ?? $lead->email ?? 'unknown',
