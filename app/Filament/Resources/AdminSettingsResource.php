@@ -54,50 +54,22 @@ class AdminSettingsResource extends Resource
                         Forms\Components\Toggle::make('admin_notify_email_processed')
                             ->label('Notify on Every Email Processed')
                             ->helperText('Receive a notification every time an email is successfully processed and leads are created')
-                            ->default(false)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_email_processed', false);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(false),
 
                         Forms\Components\Toggle::make('admin_notify_errors')
                             ->label('Notify on Email Processing Errors')
                             ->helperText('Receive notifications when email processing fails or encounters errors')
-                            ->default(true)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_errors', true);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(true),
 
                         Forms\Components\Toggle::make('admin_notify_rules_not_matched')
                             ->label('Notify When No Client Rules Match')
                             ->helperText('Receive notifications when an email doesn\'t match any client email rules')
-                            ->default(false)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_rules_not_matched', false);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(false),
 
                         Forms\Components\Toggle::make('admin_notify_duplicate_leads')
                             ->label('Notify on Duplicate Leads')
                             ->helperText('Receive notifications when duplicate leads are detected and handled')
-                            ->default(false)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_duplicate_leads', false);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(false),
                     ])->columns(1),
 
                 Forms\Components\Section::make('System Monitoring')
@@ -106,38 +78,17 @@ class AdminSettingsResource extends Resource
                         Forms\Components\Toggle::make('admin_notify_high_email_volume')
                             ->label('Notify on High Email Volume')
                             ->helperText('Receive notifications when email processing volume exceeds normal thresholds')
-                            ->default(false)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_high_email_volume', false);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(false),
 
                         Forms\Components\Toggle::make('admin_notify_imap_connection_issues')
                             ->label('Notify on IMAP Connection Issues')
                             ->helperText('Receive notifications when IMAP connection problems are detected')
-                            ->default(true)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_imap_connection_issues', true);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(true),
 
                         Forms\Components\Toggle::make('admin_notify_smtp_issues')
                             ->label('Notify on SMTP/Mail Delivery Issues')
                             ->helperText('Receive notifications when outbound email delivery fails')
-                            ->default(true)
-                            ->afterStateHydrated(function (Forms\Components\Toggle $component, ?User $record) {
-                                if ($record) {
-                                    $value = $record->getPreference('admin_notify_smtp_issues', true);
-                                    $component->state($value);
-                                }
-                            })
-                            ->dehydrated(false),
+                            ->default(true),
                     ])->columns(1),
             ]);
     }

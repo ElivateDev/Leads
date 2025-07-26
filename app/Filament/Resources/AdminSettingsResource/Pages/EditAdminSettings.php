@@ -18,10 +18,12 @@ class EditAdminSettings extends EditRecord
         ];
     }
 
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Don't save the notification preferences through normal form handling
-        // We'll handle them in afterSave
+        /** @var User $record */
+        $record = $this->record;
+
+        // Load preference values into form data
         $preferenceKeys = [
             'admin_notify_email_processed',
             'admin_notify_errors',
@@ -33,9 +35,38 @@ class EditAdminSettings extends EditRecord
         ];
 
         foreach ($preferenceKeys as $key) {
-            if (isset($data[$key])) {
-                // Store the preference values temporarily
-                $this->temporaryPreferences[$key] = $data[$key];
+            $defaultValue = match ($key) {
+                'admin_notify_errors' => true,
+                'admin_notify_imap_connection_issues' => true,
+                'admin_notify_smtp_issues' => true,
+                default => false
+            };
+            $data[$key] = $record->getPreference($key, $defaultValue);
+        }
+
+        return $data;
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        /** @var User $record */
+        $record = $this->record;
+
+        // Save the notification preferences
+        $preferenceKeys = [
+            'admin_notify_email_processed',
+            'admin_notify_errors',
+            'admin_notify_rules_not_matched',
+            'admin_notify_duplicate_leads',
+            'admin_notify_high_email_volume',
+            'admin_notify_imap_connection_issues',
+            'admin_notify_smtp_issues',
+        ];
+
+        foreach ($preferenceKeys as $key) {
+            if (array_key_exists($key, $data)) {
+                $record->setPreference($key, $data[$key] ?? false);
+                // Remove from data so it doesn't try to save to the users table
                 unset($data[$key]);
             }
         }
@@ -43,18 +74,8 @@ class EditAdminSettings extends EditRecord
         return $data;
     }
 
-    protected array $temporaryPreferences = [];
-
     protected function afterSave(): void
     {
-        /** @var User $record */
-        $record = $this->record;
-
-        // Save the notification preferences
-        foreach ($this->temporaryPreferences as $key => $value) {
-            $record->setPreference($key, $value);
-        }
-
         Notification::make()
             ->title('Notification settings updated successfully')
             ->success()
@@ -63,6 +84,6 @@ class EditAdminSettings extends EditRecord
 
     protected function getRedirectUrl(): string
     {
-        return $this->getResource()::getUrl('index');
+        return $this->getResource()::getUrl('edit', ['record' => $this->record]);
     }
 }
