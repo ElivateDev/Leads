@@ -117,13 +117,15 @@ class EmailProcessingLogger
         string $fromAddress,
         ?Client $client = null,
         ?string $reason = null,
-        array $details = []
+        array $details = [],
+        ?Lead $existingLead = null
     ): EmailProcessingLog {
         return EmailProcessingLog::create([
             'from_address' => $fromAddress,
             'type' => 'lead_duplicate',
             'status' => 'skipped',
             'client_id' => $client?->id,
+            'lead_id' => $existingLead?->id,
             'message' => $reason ?? "Duplicate lead detected for {$fromAddress}",
             'details' => $details,
             'processed_at' => now(),

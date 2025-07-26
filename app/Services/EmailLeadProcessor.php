@@ -375,23 +375,40 @@ class EmailLeadProcessor
             /** @var Client $client */
             echo "  - Client: {$client->name} (ID: {$client->id})\n";
 
-            // Check for duplicate leads (commented out for now)
-            // if ($this->leadExists($senderEmail, $phoneNumber, $client->id)) {
-            //     echo "  ✗ Lead already exists for {$client->name}\n";
-            //     Log::info('Lead already exists for: ' . $senderEmail . ' - Client: ' . $client->name);
-            //     EmailProcessingLogger::logLeadDuplicate(
-            //         $senderEmail,
-            //         $client,
-            //         'Lead already exists within the last 24 hours',
-            //         [
-            //             'phone_number' => $phoneNumber,
-            //             'client_name' => $client->name,
-            //         ]
-            //     );
-            //     continue;
-            // }
+            // Check for duplicate leads based on name, email, and phone
+            $duplicateLead = $this->findDuplicateLead($leadName, $leadEmail, $phoneNumber, $client->id);
 
-            echo "  ✓ All checks passed, creating lead for {$client->name}\n";
+            if ($duplicateLead) {
+                echo "  ✓ Duplicate lead found for {$client->name}, appending message\n";
+                Log::info('Duplicate lead found, appending message for: ' . $senderEmail . ' - Client: ' . $client->name);
+
+                $updatedLead = $this->appendMessageToLead(
+                    $duplicateLead,
+                    $message,
+                    $senderEmail,
+                    $email->subject,
+                    $email
+                );
+
+                EmailProcessingLogger::logLeadDuplicate(
+                    $senderEmail,
+                    $client,
+                    'Duplicate lead detected - message appended to existing lead',
+                    [
+                        'existing_lead_id' => $duplicateLead->id,
+                        'phone_number' => $phoneNumber,
+                        'client_name' => $client->name,
+                        'lead_name' => $leadName,
+                        'lead_email' => $leadEmail,
+                    ],
+                    $duplicateLead
+                );
+
+                $leads[] = $updatedLead;
+                continue;
+            }
+
+            echo "  ✓ All checks passed, creating new lead for {$client->name}\n";
 
             $lead = Lead::create([
                 'client_id' => $client->id,
@@ -869,6 +886,56 @@ class EmailLeadProcessor
         }
 
         return $query->exists();
+    }
+
+    /**
+     * Find existing lead with matching name, phone, and email
+     * @param string $name
+     * @param string $email
+     * @param string|null $phone
+     * @param int $clientId
+     * @return Lead|null
+     */
+    private function findDuplicateLead(string $name, string $email, ?string $phone, int $clientId): ?Lead
+    {
+        $query = Lead::where('client_id', $clientId)
+            ->where('name', $name)
+            ->where('email', $email);
+
+        if ($phone) {
+            $query->where('phone', $phone);
+        } else {
+            $query->whereNull('phone');
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * Append new message to existing lead with duplicate notation
+     * @param Lead $existingLead
+     * @param string $newMessage
+     * @param string $senderEmail
+     * @param string $emailSubject
+     * @param mixed $email
+     * @return Lead
+     */
+    private function appendMessageToLead(Lead $existingLead, string $newMessage, string $senderEmail, string $emailSubject, $email): Lead
+    {
+        $timestamp = now()->format('Y-m-d H:i:s');
+        $duplicateNote = "\n\n--- DUPLICATE SUBMISSION DETECTED ---\n";
+        $duplicateNote .= "Date: {$timestamp}\n";
+        $duplicateNote .= "From: {$senderEmail}\n";
+        $duplicateNote .= "Subject: {$emailSubject}\n";
+        $duplicateNote .= "Message:\n{$newMessage}";
+
+        $existingLead->update([
+            'message' => $existingLead->message . $duplicateNote,
+            'notes' => ($existingLead->notes ?: '') . "\nDuplicate submission received on {$timestamp}",
+            'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
+        ]);
+
+        return $existingLead;
     }
 
     /**
