@@ -631,23 +631,55 @@ class EmailLeadProcessor
     }
 
     /**
-     * Determine the lead source based on email content
+     * Determine the lead source based on email content using lead source rules
      * @param mixed $email
      * @return string
      */
     private function determineLeadSource($email): string
     {
+        // Get all active lead source rules, ordered by priority (highest first)
+        $sourceRules = \App\Models\LeadSourceRule::where('is_active', true)
+            ->orderBy('priority', 'desc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        foreach ($sourceRules as $rule) {
+            if ($rule->matchesEmail($email)) {
+                Log::info('Lead source determined by rule', [
+                    'rule_id' => $rule->id,
+                    'source' => $rule->source_name,
+                    'rule_type' => $rule->rule_type,
+                    'rule_value' => $rule->rule_value,
+                    'match_field' => $rule->match_field,
+                    'from_email' => $email->fromAddress
+                ]);
+                return $rule->source_name;
+            }
+        }
+
+        // Fallback to legacy logic if no rules match
         $subject = strtolower($email->subject ?? '');
         $fromEmail = strtolower($email->fromAddress);
 
         if (Str::contains($subject, ['contact form', 'website', 'inquiry', 'message'])) {
+            Log::info('Lead source determined by legacy rule: website (subject)', [
+                'subject' => $email->subject,
+                'from_email' => $email->fromAddress
+            ]);
             return 'website';
         }
 
         if (Str::contains($fromEmail, ['facebook', 'instagram', 'linkedin', 'twitter'])) {
+            Log::info('Lead source determined by legacy rule: social (email)', [
+                'from_email' => $email->fromAddress
+            ]);
             return 'social';
         }
 
+        Log::info('Lead source defaulted to other', [
+            'from_email' => $email->fromAddress,
+            'subject' => $email->subject
+        ]);
         return 'other';
     }
 

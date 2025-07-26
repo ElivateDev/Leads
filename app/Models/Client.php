@@ -42,6 +42,11 @@ class Client extends Model
         return $this->hasMany(CampaignRule::class);
     }
 
+    public function leadSourceRules(): HasMany
+    {
+        return $this->hasMany(LeadSourceRule::class);
+    }
+
     /**
      * Get the default lead dispositions
      */

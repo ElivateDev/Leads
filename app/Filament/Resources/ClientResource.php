@@ -13,6 +13,7 @@ use App\Filament\Resources\ClientResource\Pages;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Resources\ClientResource\RelationManagers;
 use App\Filament\Resources\ClientResource\RelationManagers\ClientEmailsRelationManager;
+use App\Filament\Resources\ClientResource\RelationManagers\LeadSourceRulesRelationManager;
 
 class ClientResource extends Resource
 {
@@ -87,6 +88,7 @@ class ClientResource extends Resource
         return [
             ClientEmailsRelationManager::class,
             RelationManagers\LeadsRelationManager::class,
+            LeadSourceRulesRelationManager::class,
         ];
     }
 
