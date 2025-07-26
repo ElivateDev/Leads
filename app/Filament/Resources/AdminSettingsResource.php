@@ -107,30 +107,27 @@ class AdminSettingsResource extends Resource
                     ->sortable(),
                 Tables\Columns\IconColumn::make('email_notifications_enabled')
                     ->label('Email Processing')
-                    ->icon(fn (User $record): string => 
-                        $record->getPreference('admin_notify_email_processed', false) ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle'
-                    )
-                    ->color(fn (User $record): string => 
-                        $record->getPreference('admin_notify_email_processed', false) ? 'success' : 'gray'
-                    )
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
                     ->tooltip('Notified on every email processed'),
                 Tables\Columns\IconColumn::make('error_notifications_enabled')
                     ->label('Errors')
-                    ->icon(fn (User $record): string => 
-                        $record->getPreference('admin_notify_errors', true) ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle'
-                    )
-                    ->color(fn (User $record): string => 
-                        $record->getPreference('admin_notify_errors', true) ? 'success' : 'gray'
-                    )
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
                     ->tooltip('Notified on processing errors'),
                 Tables\Columns\IconColumn::make('rules_notifications_enabled')
                     ->label('Unmatched Rules')
-                    ->icon(fn (User $record): string => 
-                        $record->getPreference('admin_notify_rules_not_matched', false) ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle'
-                    )
-                    ->color(fn (User $record): string => 
-                        $record->getPreference('admin_notify_rules_not_matched', false) ? 'success' : 'gray'
-                    )
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
                     ->tooltip('Notified when no client rules match'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

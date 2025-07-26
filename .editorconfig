@@ -16,3 +16,7 @@ indent_size = 2
 
 [docker-compose.yml]
 indent_size = 4
+
+[*.php]
+php_diagnostic_php6613 = false
+php_diagnostic = true

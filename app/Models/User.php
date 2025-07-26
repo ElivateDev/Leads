@@ -119,4 +119,28 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->role === 'client';
     }
+
+    /**
+     * Computed attribute for email notifications enabled status
+     */
+    public function getEmailNotificationsEnabledAttribute(): bool
+    {
+        return $this->getPreference('admin_notify_email_processed', false);
+    }
+
+    /**
+     * Computed attribute for error notifications enabled status
+     */
+    public function getErrorNotificationsEnabledAttribute(): bool
+    {
+        return $this->getPreference('admin_notify_errors', true);
+    }
+
+    /**
+     * Computed attribute for rules notifications enabled status
+     */
+    public function getRulesNotificationsEnabledAttribute(): bool
+    {
+        return $this->getPreference('admin_notify_rules_not_matched', false);
+    }
 }
