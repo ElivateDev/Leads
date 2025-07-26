@@ -6,8 +6,9 @@ use App\Models\Client;
 use App\Models\ClientEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Tests\Helpers\PrivateMethodHelper;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(Tests\TestCase::class, RefreshDatabase::class, PrivateMethodHelper::class);
 
 beforeEach(function () {
     Config::set('services.imap', [
@@ -35,14 +36,6 @@ beforeEach(function () {
     $this->mock(\PhpImap\Mailbox::class);
 });
 
-function callPrivateMethod($object, $methodName, ...$args)
-{
-    $reflection = new ReflectionClass($object);
-    $method = $reflection->getMethod($methodName);
-    $method->setAccessible(true);
-    return $method->invoke($object, ...$args);
-}
-
 test('service configuration can be set up', function () {
     expect(config('services.imap.host'))->toBe('test.example.com');
     expect(config('services.imap.port'))->toBe(993);
@@ -55,7 +48,7 @@ test('finds client by exact email match', function () {
         'fromAddress' => 'info@testclient.com'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -74,7 +67,7 @@ test('finds client by domain match', function () {
         'fromAddress' => 'sales@testclient.com'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -86,7 +79,7 @@ test('returns null when no client match found', function () {
         'fromAddress' => 'unknown@unknown.com'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->toBeNull();
 });
 
@@ -95,7 +88,7 @@ test('gets default client from environment', function () {
 
     putenv("DEFAULT_CLIENT_ID={$this->client->id}");
 
-    $defaultClient = callPrivateMethod($processor, 'getDefaultClient');
+    $defaultClient = $this->callPrivateMethod($processor, 'getDefaultClient');
     expect($defaultClient)->not->toBeNull();
     expect($defaultClient->id)->toBe($this->client->id);
 
@@ -110,7 +103,7 @@ test('detects existing lead by email', function () {
         'client_id' => $this->client->id,
     ]);
 
-    $exists = callPrivateMethod($processor, 'leadExists', 'existing@example.com', null, $this->client->id);
+    $exists = $this->callPrivateMethod($processor, 'leadExists', 'existing@example.com', null, $this->client->id);
     expect($exists)->toBeTrue();
 });
 
@@ -123,14 +116,14 @@ test('detects existing lead by phone', function () {
         'client_id' => $this->client->id,
     ]);
 
-    $exists = callPrivateMethod($processor, 'leadExists', '', '555-123-4567', $this->client->id);
+    $exists = $this->callPrivateMethod($processor, 'leadExists', '', '555-123-4567', $this->client->id);
     expect($exists)->toBeTrue();
 });
 
 test('returns false for non-existing lead', function () {
     $processor = app(EmailLeadProcessor::class);
 
-    $exists = callPrivateMethod($processor, 'leadExists', 'new@example.com', '555-999-8888', $this->client->id);
+    $exists = $this->callPrivateMethod($processor, 'leadExists', 'new@example.com', '555-999-8888', $this->client->id);
     expect($exists)->toBeFalse();
 });
 
@@ -143,7 +136,7 @@ test('extracts name from email with name field', function () {
         'fromAddress' => 'noreply@example.com'
     ];
 
-    $name = callPrivateMethod($processor, 'extractNameFromEmail', $mockEmail);
+    $name = $this->callPrivateMethod($processor, 'extractNameFromEmail', $mockEmail);
     expect($name)->toContain('John Doe');
 });
 
@@ -156,7 +149,7 @@ test('extracts name from fromName when no name field found', function () {
         'fromAddress' => 'jane@example.com'
     ];
 
-    $name = callPrivateMethod($processor, 'extractNameFromEmail', $mockEmail);
+    $name = $this->callPrivateMethod($processor, 'extractNameFromEmail', $mockEmail);
     expect($name)->toBe('Jane Smith');
 });
 
@@ -168,7 +161,7 @@ test('ignores emails from automated sources', function () {
         'subject' => 'Automated notification'
     ];
 
-    $shouldIgnore = callPrivateMethod($processor, 'shouldIgnoreEmail', $mockEmail);
+    $shouldIgnore = $this->callPrivateMethod($processor, 'shouldIgnoreEmail', $mockEmail);
     expect($shouldIgnore)->toBeTrue();
 });
 
@@ -180,7 +173,7 @@ test('does not ignore valid lead emails', function () {
         'subject' => 'Contact inquiry'
     ];
 
-    $shouldIgnore = callPrivateMethod($processor, 'shouldIgnoreEmail', $mockEmail);
+    $shouldIgnore = $this->callPrivateMethod($processor, 'shouldIgnoreEmail', $mockEmail);
     expect($shouldIgnore)->toBeFalse();
 });
 
@@ -192,7 +185,7 @@ test('extracts phone number from email content', function () {
         'textHtml' => null
     ];
 
-    $phone = callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
+    $phone = $this->callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
     expect($phone)->toContain('555')->and($phone)->toContain('123')->and($phone)->toContain('4567');
 });
 
@@ -204,7 +197,7 @@ test('returns null when no phone number found', function () {
         'textHtml' => null
     ];
 
-    $phone = callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
+    $phone = $this->callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
     expect($phone)->toBeNull();
 });
 
@@ -227,7 +220,7 @@ Powered by: Elementor',
         'textHtml' => null
     ];
 
-    $phone = callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
+    $phone = $this->callPrivateMethod($processor, 'extractPhoneNumber', $mockEmail);
     expect($phone)->toBe('987654321');
 });
 
@@ -239,7 +232,7 @@ test('determines lead source from email content', function () {
         'fromAddress' => 'noreply@website.com'
     ];
 
-    $source = callPrivateMethod($processor, 'determineLeadSource', $mockEmail);
+    $source = $this->callPrivateMethod($processor, 'determineLeadSource', $mockEmail);
     expect($source)->toBe('website');
 });
 
@@ -251,7 +244,7 @@ test('determines social media source', function () {
         'fromAddress' => 'noreply@facebook.com'
     ];
 
-    $source = callPrivateMethod($processor, 'determineLeadSource', $mockEmail);
+    $source = $this->callPrivateMethod($processor, 'determineLeadSource', $mockEmail);
     expect($source)->toBe('social');
 });
 
@@ -263,7 +256,7 @@ test('extracts email address from email content', function () {
         'fromAddress' => 'noreply@website.com'
     ];
 
-    $email = callPrivateMethod($processor, 'extractEmailAddressFromEmail', $mockEmail);
+    $email = $this->callPrivateMethod($processor, 'extractEmailAddressFromEmail', $mockEmail);
     expect($email)->toBe('customer@domain.com');
 });
 
@@ -275,7 +268,7 @@ test('falls back to sender email when no email in content', function () {
         'fromAddress' => 'sender@example.com'
     ];
 
-    $email = callPrivateMethod($processor, 'extractEmailAddressFromEmail', $mockEmail);
+    $email = $this->callPrivateMethod($processor, 'extractEmailAddressFromEmail', $mockEmail);
     expect($email)->toBe('sender@example.com');
 });
 
@@ -295,7 +288,7 @@ test('finds client by custom rule with single condition', function () {
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -316,7 +309,7 @@ test('finds client by custom rule with AND condition', function () {
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -337,7 +330,7 @@ test('custom rule with AND condition fails if one condition is missing', functio
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->toBeNull();
 });
 
@@ -357,7 +350,7 @@ test('finds client by custom rule with OR condition', function () {
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -379,7 +372,7 @@ test('finds client by combined rule when both email and custom conditions match'
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });
@@ -401,7 +394,7 @@ test('combined rule fails when email matches but custom conditions do not', func
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->toBeNull();
 });
 
@@ -422,7 +415,7 @@ test('combined rule fails when custom conditions match but email does not', func
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->toBeNull();
 });
 
@@ -443,7 +436,7 @@ test('combined rule works with domain matching and custom conditions', function 
         'subject' => 'New Lead'
     ];
 
-    $client = callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
+    $client = $this->callPrivateMethod($processor, 'findClientForEmail', $mockEmail);
     expect($client)->not->toBeNull();
     expect($client->id)->toBe($this->client->id);
 });

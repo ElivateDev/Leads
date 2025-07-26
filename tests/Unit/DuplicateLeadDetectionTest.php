@@ -7,8 +7,9 @@ use App\Models\ClientEmail;
 use App\Models\EmailProcessingLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Tests\Helpers\PrivateMethodHelper;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(Tests\TestCase::class, RefreshDatabase::class, PrivateMethodHelper::class);
 
 beforeEach(function () {
     Config::set('services.imap', [
@@ -37,14 +38,6 @@ beforeEach(function () {
     $this->mock(\PhpImap\Mailbox::class);
 });
 
-function callPrivateMethod($object, $methodName, ...$args)
-{
-    $reflection = new ReflectionClass($object);
-    $method = $reflection->getMethod($methodName);
-    $method->setAccessible(true);
-    return $method->invoke($object, ...$args);
-}
-
 test('creates new lead when no duplicate exists', function () {
     $processor = app(EmailLeadProcessor::class);
 
@@ -60,7 +53,7 @@ Message: I am interested in your services.',
     ];
 
     // Process the email
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should create one new lead
     expect($leads)->toHaveCount(1);
@@ -113,7 +106,7 @@ Message: This is my second inquiry with additional details.',
     ];
 
     // Process the email
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should return the updated existing lead
     expect($leads)->toHaveCount(1);
@@ -175,7 +168,7 @@ Message: This is from a different person.',
         'date' => '2025-07-26 11:00:00',
     ];
 
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should create a new lead since name is different
     expect($leads)->toHaveCount(1);
@@ -213,7 +206,7 @@ Message: This is from a different email.',
         'date' => '2025-07-26 11:00:00',
     ];
 
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should create a new lead since email is different
     expect($leads)->toHaveCount(1);
@@ -250,7 +243,7 @@ Message: This is from a different phone.',
         'date' => '2025-07-26 11:00:00',
     ];
 
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should create a new lead since phone is different
     expect($leads)->toHaveCount(1);
@@ -286,7 +279,7 @@ Message: This is a follow-up without phone.',
         'date' => '2025-07-26 11:00:00',
     ];
 
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should detect as duplicate and update existing lead
     expect($leads)->toHaveCount(1);
@@ -334,7 +327,7 @@ Message: Same contact info, different clients.',
         'date' => '2025-07-26 11:00:00',
     ];
 
-    $leads = callPrivateMethod($processor, 'processEmail', $mockEmail);
+    $leads = $this->callPrivateMethod($processor, 'processEmail', $mockEmail);
 
     // Should create leads for both clients - one duplicate update, one new
     expect($leads)->toHaveCount(2);
