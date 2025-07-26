@@ -23,7 +23,7 @@ class EmailProcessingLogResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Email Processing Logs';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static ?string $navigationGroup = 'Administration';
 
     protected static ?int $navigationSort = 10;
 

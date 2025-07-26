@@ -26,6 +26,7 @@ class ClientPanelProvider extends PanelProvider
         return $panel
             ->id('client')
             ->path('client')
+            ->favicon(asset('images/favicon.png'))
             ->login()
             ->authGuard('web')
             ->brandLogoHeight('2rem')

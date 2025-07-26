@@ -293,55 +293,10 @@ function updateScrollNavigation() {
         scrollLeftBtn.disabled = scrollLeft <= 0;
         scrollRightBtn.disabled = scrollLeft >= maxScrollLeft;
 
-        // Update scroll dots and info
-        updateScrollDots();
         updateVisibleColumnsInfo();
     } else {
         scrollNavigation.style.display = 'none';
     }
-}
-
-// Update scroll dots
-function updateScrollDots() {
-    const columnsContainer = document.getElementById('disposition-columns');
-    const scrollDotsContainer = document.getElementById('scroll-dots');
-    const visibleColumns = Array.from(document.querySelectorAll('.disposition-column')).filter(col =>
-        col.style.display !== 'none'
-    );
-
-    if (!columnsContainer || !scrollDotsContainer || visibleColumns.length <= 3) {
-        scrollDotsContainer.innerHTML = '';
-        return;
-    }
-
-    // Calculate number of "pages" (groups of ~3 columns visible at once)
-    const containerWidth = columnsContainer.clientWidth;
-    const columnWidth = 320 + 24; // min-width + gap
-    const columnsPerPage = Math.floor(containerWidth / columnWidth) || 1;
-    const totalPages = Math.ceil(visibleColumns.length / columnsPerPage);
-
-    // Clear existing dots
-    scrollDotsContainer.innerHTML = '';
-
-    // Create dots
-    for (let i = 0; i < totalPages; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'scroll-dot';
-        dot.onclick = () => scrollToPage(i);
-        scrollDotsContainer.appendChild(dot);
-    }
-
-    // Update active dot
-    const scrollLeft = columnsContainer.scrollLeft;
-    const currentPage = Math.floor(scrollLeft / (containerWidth));
-    const dots = scrollDotsContainer.querySelectorAll('.scroll-dot');
-    dots.forEach((dot, index) => {
-        if (index === currentPage) {
-            dot.classList.add('active');
-        } else {
-            dot.classList.remove('active');
-        }
-    });
 }
 
 // Update visible columns info
