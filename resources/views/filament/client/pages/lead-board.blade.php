@@ -13,7 +13,9 @@
             :leads="$leads" />
 
         <x-client.components.scroll-navigation
-            :visible-columns-count="$visibleColumnsCount" />
+            :visible-columns-count="$visibleColumnsCount"
+            :should-show-scroll-navigation="$shouldShowScrollNavigation"
+            wire:key="scroll-navigation" />
 
         <div class="columns-wrapper">
             <div class="disposition-columns" id="disposition-columns">

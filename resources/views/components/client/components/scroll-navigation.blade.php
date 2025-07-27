@@ -1,6 +1,6 @@
-@props(['visibleColumnsCount'])
+@props(['visibleColumnsCount', 'shouldShowScrollNavigation' => true])
 
-<div class="scroll-navigation" id="scroll-navigation">
+<div class="scroll-navigation" id="scroll-navigation" style="{{ $shouldShowScrollNavigation ? '' : 'display: none;' }}">
     <button type="button" class="scroll-btn" id="scroll-left" onclick="scrollColumns('left')">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd"

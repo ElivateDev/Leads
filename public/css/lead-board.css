@@ -4,7 +4,7 @@
 
 .disposition-columns {
     display: flex;
-    gap: 1.5rem;
+    gap: 1rem;
     margin-top: 1rem;
     overflow-x: auto;
     padding-bottom: 1rem;
@@ -39,13 +39,25 @@
     }
 }
 
+/* Make columns more compact on larger screens to fit more */
+@media (min-width: 1200px) {
+    .disposition-column {
+        min-width: 260px;
+        padding: 0.5rem;
+    }
+
+    .disposition-columns {
+        gap: 0.75rem;
+    }
+}
+
 .disposition-column {
     background: rgb(249 250 251);
     border: 1px solid rgb(229 231 235);
     border-radius: 0.75rem;
-    padding: 1rem;
+    padding: 0.75rem;
     min-height: 400px;
-    min-width: 320px;
+    min-width: 280px;
     flex-shrink: 0;
     transition: all 0.2s ease;
 }
@@ -70,7 +82,7 @@
 
 .disposition-title {
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: rgb(55 65 81);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -96,8 +108,8 @@
     background: white;
     border: 1px solid rgb(229 231 235);
     border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
     cursor: move;
     transition: all 0.2s ease;
     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);

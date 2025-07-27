@@ -170,6 +170,7 @@ class LeadBoard extends Page
             'filterPanelOpen' => $this->filterPanelOpen,
             'columnOrder' => $this->columnOrder,
             'visibleColumnsCount' => $this->visibleColumnsCount,
+            'shouldShowScrollNavigation' => $this->shouldShowScrollNavigation,
             'showNotesModal' => $this->showNotesModal,
             'currentLeadName' => $this->currentLeadName,
         ];
@@ -179,6 +180,13 @@ class LeadBoard extends Page
     public function visibleColumnsCount(): int
     {
         return count($this->visibleDispositions);
+    }
+
+    #[Computed]
+    public function shouldShowScrollNavigation(): bool
+    {
+        // TODO: We fine-tune this in js until I learn how to do this properly in livewire.
+        return $this->visibleColumnsCount > 4;
     }
 
     #[Computed]
