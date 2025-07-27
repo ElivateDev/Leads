@@ -1,13 +1,8 @@
-// Lead Board JavaScript Functionality
-
 let draggedElement = null;
 let draggedLeadId = null;
 let draggedFromDisposition = null;
-let visibleDispositions = [];
-let columnOrder = [];
 let draggedColumn = null;
 let dropIndicator = null;
-let filterPanelOpen = false;
 
 function getLivewireComponent() {
     const wireElement = document.querySelector('[wire\\:id]');
@@ -23,78 +18,11 @@ function initializeDragAndDrop() {
     });
 }
 
-function initializeFilters() {
-    filterPanelOpen = window.initialFilterPanelOpen !== undefined ? window.initialFilterPanelOpen : true;
-
-    const filterOptions = document.getElementById('filter-options');
-    const toggleIcon = document.querySelector('.filter-toggle-icon');
-
-    if (!filterPanelOpen) {
-        filterOptions.style.display = 'none';
-        if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
-    }
-
-    if (window.initialVisibleDispositions) {
-        visibleDispositions = window.initialVisibleDispositions;
-    } else {
-        visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
-    }
-
-    initializeColumnOrderOnLoad();
-    initializeFilterEventListeners();
-    updateFilterDisplay();
-    updateColumnVisibilityOnly();
-    updateScrollIndicator();
-}
-
-function initializeColumnOrderOnLoad() {
-    if (window.initialColumnOrder) {
-        columnOrder = window.initialColumnOrder;
-        applyColumnOrder();
-    } else {
-        columnOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
-    }
-}
-
-function applyColumnOrder() {
-    const columnsContainer = document.getElementById('disposition-columns');
-    if (!columnsContainer) return;
-
-    const columns = Array.from(columnsContainer.children);
-    const currentOrder = columns.map(col => col.dataset.disposition);
-    const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-
-    if (!needsReordering) {
-        return;
-    }
-
-    columnsContainer.style.transition = 'opacity 0.15s ease';
-    columnsContainer.style.opacity = '0.7';
-
-    columnOrder.forEach((dispositionKey, index) => {
-        const column = columns.find(col => col.dataset.disposition === dispositionKey);
-        if (column) {
-            columnsContainer.appendChild(column);
-        }
-    });
-
-    setTimeout(() => {
-        columnsContainer.style.opacity = '1';
-        setTimeout(() => {
-            columnsContainer.style.transition = '';
-        }, 150);
-    }, 50);
-}
-
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
-    columnOrder = columns.map(col => col.dataset.disposition);
+    const columnOrder = columns.map(col => col.dataset.disposition);
 
-    // Directly set the Livewire property instead of calling a method
+    // Save column order to Livewire
     getLivewireComponent()?.set('columnOrder', columnOrder);
 }
 
@@ -117,14 +45,6 @@ function hideDropIndicator() {
     if (dropIndicator) {
         dropIndicator.remove();
         dropIndicator = null;
-    }
-}
-
-function updateScrollIndicator() {
-    const columnsContainer = document.getElementById('disposition-columns');
-    if (columnsContainer) {
-        // Update scroll navigation visibility
-        updateScrollNavigation();
     }
 }
 
@@ -169,163 +89,6 @@ function scrollColumns(direction) {
             left: scrollAmount,
             behavior: 'smooth'
         });
-    }
-}
-
-function scrollToPage(pageIndex) {
-    const columnsContainer = document.getElementById('disposition-columns');
-    if (!columnsContainer) return;
-
-    const containerWidth = columnsContainer.clientWidth;
-    const scrollLeft = pageIndex * containerWidth;
-
-    columnsContainer.scrollTo({
-        left: scrollLeft,
-        behavior: 'smooth'
-    });
-}
-
-function updateFilterDisplay() {
-    document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
-        const dispositionKey = checkbox.id.replace('checkbox-', '');
-        const isVisible = visibleDispositions.includes(dispositionKey);
-
-        if (isVisible) {
-            checkbox.classList.add('checked');
-        } else {
-            checkbox.classList.remove('checked');
-        }
-    });
-}
-
-function updateColumnVisibilityOnly() {
-    // Show/hide columns based on filter
-    document.querySelectorAll('.disposition-column').forEach(column => {
-        const dispositionKey = column.dataset.disposition;
-        const isVisible = visibleDispositions.includes(dispositionKey);
-
-        if (isVisible) {
-            column.style.display = '';
-        } else {
-            column.style.display = 'none';
-        }
-    });
-
-    // Update scroll indicator after visibility changes
-    setTimeout(() => {
-        updateScrollIndicator();
-    }, 100);
-}
-
-function toggleDisposition(dispositionKey) {
-    const index = visibleDispositions.indexOf(dispositionKey);
-
-    if (index > -1) {
-        visibleDispositions.splice(index, 1);
-    } else {
-        visibleDispositions.push(dispositionKey);
-    }
-
-    updateFilterDisplay();
-    updateColumnVisibilityOnly();
-
-    if (toggleDisposition.timeout) {
-        clearTimeout(toggleDisposition.timeout);
-    }
-    toggleDisposition.timeout = setTimeout(() => {
-        // Directly set the Livewire property instead of calling a method
-        getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
-    }, 500);
-}
-
-function selectAllDispositions() {
-    visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-        col.dataset.disposition
-    );
-
-    updateFilterDisplay();
-    updateColumnVisibilityOnly();
-
-    if (toggleDisposition.timeout) {
-        clearTimeout(toggleDisposition.timeout);
-    }
-    // Directly set the Livewire property instead of calling a method
-    getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
-}
-
-function selectNoneDispositions() {
-    visibleDispositions = [];
-
-    updateFilterDisplay();
-    updateColumnVisibilityOnly();
-    // Directly set the Livewire property instead of calling a method
-    getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
-}
-
-function toggleFilterPanel() {
-    const filterOptions = document.getElementById('filter-options');
-    const toggleIcon = document.querySelector('.filter-toggle-icon');
-
-    filterPanelOpen = !filterPanelOpen;
-
-    if (filterPanelOpen) {
-        filterOptions.style.display = 'grid';
-        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
-    } else {
-        filterOptions.style.display = 'none';
-        if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
-    }
-
-    // Directly set the Livewire property instead of calling a method
-    getLivewireComponent()?.set('filterPanelOpen', filterPanelOpen);
-}
-
-function initializeFilterEventListeners() {
-    const filterPanel = document.querySelector('.filter-panel');
-    if (!filterPanel) return;
-
-    filterPanel.removeEventListener('click', handleFilterPanelClick);
-    filterPanel.addEventListener('click', handleFilterPanelClick);
-}
-
-// Handle all filter panel clicks in one place
-function handleFilterPanelClick(e) {
-    const target = e.target;
-
-    // Check if click is on a filter option or its children
-    const filterOption = target.closest('.filter-option');
-    if (filterOption) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const dispositionKey = filterOption.dataset.disposition;
-        toggleDisposition(dispositionKey);
-
-        return;
-    }
-
-    // Check if click is on filter title or its children (but not in filter options area)
-    const filterTitle = target.closest('.filter-title');
-    if (filterTitle) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        toggleFilterPanel();
-        return;
-    }
-
-    // Check if click is on quick action buttons
-    if (target.classList.contains('quick-action-btn')) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const buttonText = target.textContent.trim();
-        if (buttonText === 'All') {
-            selectAllDispositions();
-        } else if (buttonText === 'None') {
-            selectNoneDispositions();
-        }
-        return;
     }
 }
 
@@ -465,21 +228,18 @@ document.addEventListener('drop', function(e) {
 document.addEventListener('livewire:updated', function(event) {
     setTimeout(() => {
         initializeDragAndDrop();
-        updateScrollIndicator();
-        updateFilterDisplay();
-        updateColumnVisibilityOnly();
+        updateScrollNavigation();
     }, 100);
 });
 
 window.addEventListener('resize', function() {
     setTimeout(() => {
-        updateScrollIndicator();
+        updateScrollNavigation();
     }, 100);
 });
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
-    initializeFilters();
 
     const columnsContainer = document.getElementById('disposition-columns');
     if (columnsContainer) {
