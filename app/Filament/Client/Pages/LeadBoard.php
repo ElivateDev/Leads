@@ -24,6 +24,12 @@ class LeadBoard extends Page
     public $leads = [];
     public $dispositions = [];
     public $visibleDispositions = [];
+    public $filterPanelOpen = true;
+    public $columnOrder = [];
+    public $showNotesModal = false;
+    public $currentLeadId = null;
+    public $currentLeadName = '';
+    public $currentNotes = '';
 
     public function mount(): void
     {
@@ -32,12 +38,24 @@ class LeadBoard extends Page
         // Load user preferences for visible dispositions
         $user = Filament::auth()->user();
         $savedVisibleDispositions = $user->getPreference('leadboard_visible_dispositions');
+        $savedFilterPanelOpen = $user->getPreference('leadboard_filter_panel_open');
+        $savedColumnOrder = $user->getPreference('leadboard_column_order');
 
         if ($savedVisibleDispositions) {
             $this->visibleDispositions = array_intersect($savedVisibleDispositions, array_keys($this->dispositions));
         } else {
             // Initialize visible dispositions to all by default
             $this->visibleDispositions = array_keys($this->dispositions);
+        }
+
+        // Set filter panel state
+        $this->filterPanelOpen = $savedFilterPanelOpen !== null ? $savedFilterPanelOpen : true;
+
+        // Set column order
+        if ($savedColumnOrder) {
+            $this->columnOrder = array_intersect($savedColumnOrder, array_keys($this->dispositions));
+        } else {
+            $this->columnOrder = array_keys($this->dispositions);
         }
     }
 
@@ -88,6 +106,63 @@ class LeadBoard extends Page
         }
     }
 
+    public function openNotesModal($leadId): void
+    {
+        $user = Filament::auth()->user();
+
+        $lead = Lead::where('id', $leadId)
+            ->where('client_id', $user->client_id)
+            ->first();
+
+        if ($lead) {
+            $this->currentLeadId = $leadId;
+            $this->currentLeadName = $lead->name;
+            $this->currentNotes = $lead->notes ?? '';
+            $this->showNotesModal = true;
+        }
+    }
+
+    public function closeNotesModal(): void
+    {
+        $this->showNotesModal = false;
+        $this->currentLeadId = null;
+        $this->currentLeadName = '';
+        $this->currentNotes = '';
+    }
+
+    public function saveNotes(): void
+    {
+        if (!$this->currentLeadId)
+            return;
+
+        $user = Filament::auth()->user();
+
+        $lead = Lead::where('id', $this->currentLeadId)
+            ->where('client_id', $user->client_id)
+            ->first();
+
+        if ($lead) {
+            $lead->update(['notes' => $this->currentNotes]);
+
+            // Refresh the leads data to show updated notes indicator
+            $this->loadData();
+
+            Notification::make()
+                ->title('Notes Updated')
+                ->body("Notes updated for '{$lead->name}'")
+                ->success()
+                ->send();
+
+            $this->closeNotesModal();
+        } else {
+            Notification::make()
+                ->title('Error')
+                ->body('Unable to update lead notes')
+                ->danger()
+                ->send();
+        }
+    }
+
     public function updateLeadNotes($leadId, $notes): void
     {
         $user = Filament::auth()->user();
@@ -122,28 +197,49 @@ class LeadBoard extends Page
             'dispositions' => $this->dispositions,
             'leads' => $this->leads,
             'visibleDispositions' => $this->visibleDispositions,
+            'filterPanelOpen' => $this->filterPanelOpen,
+            'columnOrder' => $this->columnOrder,
+            'visibleColumnsCount' => $this->getVisibleColumnsCountProperty(),
+            'showNotesModal' => $this->showNotesModal,
+            'currentLeadName' => $this->currentLeadName,
         ];
     }
 
-    public function updateVisibleDispositions($visibleDispositions): void
+    public function getVisibleColumnsCountProperty(): int
     {
-        $this->visibleDispositions = array_intersect($visibleDispositions, array_keys($this->dispositions));
+        return count($this->visibleDispositions);
+    }
 
-        // Save to user preferences
+    public function getNotesTooltip($leadNotes): string
+    {
+        if (!empty($leadNotes)) {
+            // Truncate long notes for tooltip display
+            return strlen($leadNotes) > 100
+                ? substr($leadNotes, 0, 100) . '...'
+                : $leadNotes;
+        }
+
+        return 'Click to add notes';
+    }
+
+    public function updatedFilterPanelOpen(): void
+    {
+        // Automatically save filter panel state when it changes
+        $user = Filament::auth()->user();
+        $user->setPreference('leadboard_filter_panel_open', $this->filterPanelOpen);
+    }
+
+    public function updatedVisibleDispositions(): void
+    {
+        // Automatically save visible dispositions when they change
         $user = Filament::auth()->user();
         $user->setPreference('leadboard_visible_dispositions', $this->visibleDispositions);
     }
 
-    public function updateColumnOrder($columnOrder): void
+    public function updatedColumnOrder(): void
     {
-        // Save column order to user preferences
+        // Automatically save column order when it changes
         $user = Filament::auth()->user();
-        $user->setPreference('leadboard_column_order', $columnOrder);
-    }
-
-    public function getColumnOrder(): array
-    {
-        $user = Filament::auth()->user();
-        return $user->getPreference('leadboard_column_order', array_keys($this->dispositions));
+        $user->setPreference('leadboard_column_order', $this->columnOrder);
     }
 }

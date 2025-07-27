@@ -27,21 +27,25 @@
                 </div>
             </div>
             <div class="filter-options" id="filter-options"
-                 style="display: grid;">
-                @foreach ($dispositions as $dispositionKey => $dispositionLabel)
-                    <div class="filter-option" data-disposition="{{ $dispositionKey }}">
-                        <div class="filter-checkbox checked" id="checkbox-{{ $dispositionKey }}">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                    clip-rule="evenodd" />
-                            </svg>
+                 style="display: {{ $filterPanelOpen ? 'grid' : 'none' }};">
+                @foreach ($columnOrder as $dispositionKey)
+                    @if(isset($dispositions[$dispositionKey]))
+                        @php $dispositionLabel = $dispositions[$dispositionKey]; @endphp
+                        <div class="filter-option" data-disposition="{{ $dispositionKey }}">
+                            <div class="filter-checkbox {{ in_array($dispositionKey, $visibleDispositions) ? 'checked' : '' }}"
+                                 id="checkbox-{{ $dispositionKey }}">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd"
+                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <span class="filter-label">{{ $dispositionLabel }}</span>
+                            <span class="lead-count" style="margin-left: auto;">
+                                {{ isset($leads[$dispositionKey]) ? count($leads[$dispositionKey]) : 0 }}
+                            </span>
                         </div>
-                        <span class="filter-label">{{ $dispositionLabel }}</span>
-                        <span class="lead-count" style="margin-left: auto;">
-                            {{ isset($leads[$dispositionKey]) ? count($leads[$dispositionKey]) : 0 }}
-                        </span>
-                    </div>
+                    @endif
                 @endforeach
             </div>
         </div>
@@ -63,7 +67,7 @@
                         d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
                         clip-rule="evenodd" />
                 </svg>
-                <span id="visible-columns-info">Showing columns</span>
+                <span id="visible-columns-info">Showing {{ $visibleColumnsCount }} columns</span>
             </div>
 
             <button type="button" class="scroll-btn" id="scroll-right" onclick="scrollColumns('right')">
@@ -78,11 +82,12 @@
 
         <div class="columns-wrapper">
             <div class="disposition-columns" id="disposition-columns">
-                @foreach ($this->getColumnOrder() as $dispositionKey)
+                @foreach ($columnOrder as $dispositionKey)
                     @if(isset($dispositions[$dispositionKey]))
                         @php $dispositionLabel = $dispositions[$dispositionKey]; @endphp
                         <div class="disposition-column" data-disposition="{{ $dispositionKey }}"
-                            id="column-{{ $dispositionKey }}" data-column-order="{{ $loop->index }}">
+                            id="column-{{ $dispositionKey }}" data-column-order="{{ $loop->index }}"
+                            style="{{ in_array($dispositionKey, $visibleDispositions) ? '' : 'display: none;' }}">
                             <div class="column-drag-handle" draggable="true">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                     <path
@@ -106,11 +111,10 @@
                                             @endif
                                             <div class="lead-card-actions">
                                                 <button class="action-btn"
-                                                    onclick="openNotesModal({{ $lead['id'] }}, '{{ addslashes($lead['name']) }}', {{ json_encode($lead['notes'] ?? '') }})"
-                                                    title="Notes" x-data="{
-                                                        tooltip: @js(!empty($lead['notes']) ? $lead['notes'] : 'Click to add notes'),
-                                                        hasNotes: @js(!empty($lead['notes']))
-                                                    }" x-tooltip="tooltip">
+                                                    wire:click="openNotesModal({{ $lead['id'] }})"
+                                                    x-data="{ tooltip: @js($this->getNotesTooltip($lead['notes'] ?? '')) }"
+                                                    x-tooltip="tooltip"
+                                                    x-on:livewire:updated.window="tooltip = @js($this->getNotesTooltip($lead['notes'] ?? ''))">
                                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                         <path
                                                             d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
@@ -182,33 +186,42 @@
                     @endif
                 @endforeach
             </div>
-        </div>        <!-- Notes Modal -->
-        <div class="notes-modal" id="notes-modal">
-            <div class="notes-modal-content">
-                <div class="notes-header">
-                    <h3 class="notes-title" id="notes-modal-title">Notes for Lead</h3>
-                    <button class="close-btn" onclick="closeNotesModal()">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-                <textarea class="notes-textarea" id="notes-textarea" placeholder="Add your notes here..."></textarea>
-                <div class="notes-actions">
-                    <button class="btn btn-secondary" onclick="closeNotesModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveNotes()">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Save Notes
-                    </button>
+        </div>
+
+        <!-- Notes Modal -->
+        @if($showNotesModal)
+            <div class="notes-modal show" wire:click.self="closeNotesModal">
+                <div class="notes-modal-content">
+                    <div class="notes-header">
+                        <h3 class="notes-title">Notes for {{ $currentLeadName }}</h3>
+                        <button class="close-btn" wire:click="closeNotesModal">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                    <textarea
+                        class="notes-textarea"
+                        wire:model="currentNotes"
+                        placeholder="Add your notes here..."
+                        wire:keydown.escape="closeNotesModal">
+                    </textarea>
+                    <div class="notes-actions">
+                        <button class="btn btn-secondary" wire:click="closeNotesModal">Cancel</button>
+                        <button class="btn btn-primary" wire:click="saveNotes">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Save Notes
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        @endif
     </div>
 
     @push('scripts')
@@ -217,10 +230,13 @@
             window.livewireComponentId = '{{ $_instance->getId() }}';
 
             // Pass initial column order from database
-            window.initialColumnOrder = @json($this->getColumnOrder());
+            window.initialColumnOrder = @json($columnOrder);
 
             // Pass initial visible dispositions
             window.initialVisibleDispositions = @json($visibleDispositions);
+
+            // Pass initial filter panel state
+            window.initialFilterPanelOpen = @json($filterPanelOpen);
         </script>
         <script src="{{ asset('js/lead-board.js') }}"></script>
     @endpush
