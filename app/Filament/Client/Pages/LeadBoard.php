@@ -7,6 +7,7 @@ use App\Models\UserPreference;
 use Filament\Pages\Page;
 use Filament\Facades\Filament;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Computed;
 use Filament\Notifications\Notification;
 
 class LeadBoard extends Page
@@ -21,6 +22,7 @@ class LeadBoard extends Page
 
     protected static ?int $navigationSort = 2;
 
+    // Livewire properties
     public $leads = [];
     public $dispositions = [];
     public $visibleDispositions = [];
@@ -34,8 +36,6 @@ class LeadBoard extends Page
     public function mount(): void
     {
         $this->loadData();
-
-        // Load user preferences for visible dispositions
         $user = Filament::auth()->user();
         $savedVisibleDispositions = $user->getPreference('leadboard_visible_dispositions');
         $savedFilterPanelOpen = $user->getPreference('leadboard_filter_panel_open');
@@ -66,12 +66,14 @@ class LeadBoard extends Page
 
         $this->dispositions = $client->getLeadDispositions();
 
-        // Group leads by disposition
         $leads = Lead::where('client_id', $user->client_id)
             ->orderBy('created_at', 'desc')
             ->get();
 
         $this->leads = $leads->groupBy('status')->toArray();
+
+        // Dispatch event to update tooltips
+        $this->dispatch('tooltipsUpdated');
     }
 
     public function updateLeadDisposition($leadId, $newDisposition): void
@@ -86,11 +88,7 @@ class LeadBoard extends Page
             $oldDisposition = $lead->status;
             $lead->update(['status' => $newDisposition]);
 
-            // Refresh the leads data
             $this->loadData();
-
-            // Dispatch event to reinitialize drag and drop
-            $this->dispatch('leadUpdated');
 
             Notification::make()
                 ->title('Lead Updated')
@@ -163,34 +161,6 @@ class LeadBoard extends Page
         }
     }
 
-    public function updateLeadNotes($leadId, $notes): void
-    {
-        $user = Filament::auth()->user();
-
-        $lead = Lead::where('id', $leadId)
-            ->where('client_id', $user->client_id)
-            ->first();
-
-        if ($lead) {
-            $lead->update(['notes' => $notes]);
-
-            // Refresh the leads data
-            $this->loadData();
-
-            Notification::make()
-                ->title('Notes Updated')
-                ->body("Notes updated for '{$lead->name}'")
-                ->success()
-                ->send();
-        } else {
-            Notification::make()
-                ->title('Error')
-                ->body('Unable to update lead notes')
-                ->danger()
-                ->send();
-        }
-    }
-
     protected function getViewData(): array
     {
         return [
@@ -199,24 +169,39 @@ class LeadBoard extends Page
             'visibleDispositions' => $this->visibleDispositions,
             'filterPanelOpen' => $this->filterPanelOpen,
             'columnOrder' => $this->columnOrder,
-            'visibleColumnsCount' => $this->getVisibleColumnsCountProperty(),
+            'visibleColumnsCount' => $this->visibleColumnsCount,
             'showNotesModal' => $this->showNotesModal,
             'currentLeadName' => $this->currentLeadName,
         ];
     }
 
-    public function getVisibleColumnsCountProperty(): int
+    #[Computed]
+    public function visibleColumnsCount(): int
     {
         return count($this->visibleDispositions);
     }
 
-    public function getNotesTooltip($leadNotes): string
+    #[Computed]
+    public function leadTooltips()
     {
-        if (!empty($leadNotes)) {
+        $tooltips = [];
+
+        foreach ($this->leads as $dispositionKey => $leadsInDisposition) {
+            foreach ($leadsInDisposition as $lead) {
+                $tooltips[$lead['id']] = $this->generateTooltipText($lead['notes'] ?? '');
+            }
+        }
+
+        return $tooltips;
+    }
+
+    private function generateTooltipText(string $notes): string
+    {
+        if (!empty($notes)) {
             // Truncate long notes for tooltip display
-            return strlen($leadNotes) > 100
-                ? substr($leadNotes, 0, 100) . '...'
-                : $leadNotes;
+            return strlen($notes) > 100
+                ? substr($notes, 0, 100) . '...'
+                : $notes;
         }
 
         return 'Click to add notes';
@@ -224,14 +209,12 @@ class LeadBoard extends Page
 
     public function updatedFilterPanelOpen(): void
     {
-        // Automatically save filter panel state when it changes
         $user = Filament::auth()->user();
         $user->setPreference('leadboard_filter_panel_open', $this->filterPanelOpen);
     }
 
     public function updatedVisibleDispositions(): void
     {
-        // Automatically save visible dispositions when they change
         $user = Filament::auth()->user();
         $user->setPreference('leadboard_visible_dispositions', $this->visibleDispositions);
     }
@@ -258,15 +241,35 @@ class LeadBoard extends Page
 
         // Re-index array to ensure clean indexes
         $this->visibleDispositions = array_values($this->visibleDispositions);
+
+        // Explicitly save preferences since updated hook might not trigger
+        $this->saveVisibleDispositionsPreference();
     }
 
     public function selectAllDispositions(): void
     {
         $this->visibleDispositions = array_keys($this->dispositions);
+
+        $this->saveVisibleDispositionsPreference();
     }
 
     public function selectNoneDispositions(): void
     {
         $this->visibleDispositions = [];
+
+        // Explicitly save preferences
+        $this->saveVisibleDispositionsPreference();
+    }
+
+    private function saveVisibleDispositionsPreference(): void
+    {
+        $user = Filament::auth()->user();
+        $user->setPreference('leadboard_visible_dispositions', $this->visibleDispositions);
+
+        // Debug logging
+        \Log::info('Visible dispositions saved explicitly', [
+            'user_id' => $user->id,
+            'visible_dispositions' => $this->visibleDispositions
+        ]);
     }
 }

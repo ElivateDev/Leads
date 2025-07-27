@@ -5,18 +5,15 @@
     @if (!empty($lead['notes']))
         <div class="notes-indicator" title="Has notes"></div>
     @endif
-    
+
     <div class="lead-card-actions">
-        <button class="action-btn"
-                wire:click="openNotesModal({{ $lead['id'] }})"
-                x-data="{ tooltip: @js($this->getNotesTooltip($lead['notes'] ?? '')) }"
-                x-tooltip="tooltip"
-                x-on:livewire:updated.window="tooltip = @js($this->getNotesTooltip($lead['notes'] ?? ''))">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                    d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
-            </svg>
-        </button>
+        <x-filament::icon-button
+            icon="heroicon-m-document-text"
+            wire:click="openNotesModal({{ $lead['id'] }})"
+            tooltip="{{ $this->leadTooltips[$lead['id']] ?? 'Click to add notes' }}"
+            size="sm"
+            color="gray"
+        />
         <button class="action-btn drag-handle" title="Drag to move">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path
@@ -24,9 +21,9 @@
             </svg>
         </button>
     </div>
-    
+
     <div class="lead-name">{{ $lead['name'] }}</div>
-    
+
     @if ($lead['email'])
         <div class="lead-info">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -40,7 +37,7 @@
             </a>
         </div>
     @endif
-    
+
     @if ($lead['phone'])
         <div class="lead-info">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -53,11 +50,11 @@
             </a>
         </div>
     @endif
-    
+
     @if ($lead['source'])
         <span class="lead-source">{{ $lead['source'] }}</span>
     @endif
-    
+
     @if ($lead['campaign'])
         <span class="lead-campaign" style="background-color: #10b981; color: white; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; margin-left: 0.25rem;">
             <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -66,7 +63,7 @@
             {{ $lead['campaign'] }}
         </span>
     @endif
-    
+
     @if ($lead['created_at'])
         <div class="lead-info" style="margin-top: 0.5rem; font-size: 0.75rem;">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
