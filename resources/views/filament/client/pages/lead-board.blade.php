@@ -25,7 +25,8 @@
                             :disposition-label="$dispositionLabel"
                             :leads="$leads"
                             :visible-dispositions="$visibleDispositions"
-                            :loop-index="$loop->index" />
+                            :loop-index="$loop->index"
+                            wire:key="column-{{ $dispositionKey }}" />
                     @endif
                 @endforeach
             </div>

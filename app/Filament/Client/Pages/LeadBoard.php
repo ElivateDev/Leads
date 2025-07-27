@@ -226,6 +226,14 @@ class LeadBoard extends Page
         $user->setPreference('leadboard_column_order', $this->columnOrder);
     }
 
+    public function updateColumnOrder(array $newOrder): void
+    {
+        $this->columnOrder = $newOrder;
+
+        $user = Filament::auth()->user();
+        $user->setPreference('leadboard_column_order', $this->columnOrder);
+    }
+
     public function toggleDisposition(string $dispositionKey): void
     {
         if (in_array($dispositionKey, $this->visibleDispositions)) {

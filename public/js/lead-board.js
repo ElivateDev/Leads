@@ -5,6 +5,10 @@ let draggedColumn = null;
 let dropIndicator = null;
 
 function getLivewireComponent() {
+    if (window.livewireComponentId) {
+        return Livewire.find(window.livewireComponentId);
+    }
+
     const wireElement = document.querySelector('[wire\\:id]');
     if (wireElement) {
         return Livewire.find(wireElement.getAttribute('wire:id'));
@@ -16,14 +20,23 @@ function initializeDragAndDrop() {
     document.querySelectorAll('.lead-card').forEach(card => {
         card.draggable = true;
     });
+
+    document.querySelectorAll('.column-drag-handle').forEach(handle => {
+        const column = handle.closest('.disposition-column');
+        if (column) {
+            handle.draggable = true;
+        }
+    });
 }
 
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
     const columnOrder = columns.map(col => col.dataset.disposition);
 
-    // Save column order to Livewire
-    getLivewireComponent()?.set('columnOrder', columnOrder);
+    const component = getLivewireComponent();
+    if (component) {
+        component.call('updateColumnOrder', columnOrder);
+    }
 }
 
 function showDropIndicator(targetColumn, isAfter) {
