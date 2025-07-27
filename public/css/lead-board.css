@@ -42,7 +42,7 @@
 /* Make columns more compact on larger screens to fit more */
 @media (min-width: 1200px) {
     .disposition-column {
-        min-width: 260px;
+        width: 240px;
         padding: 0.5rem;
     }
 
@@ -57,7 +57,7 @@
     border-radius: 0.75rem;
     padding: 0.75rem;
     min-height: 400px;
-    min-width: 280px;
+    width: 256px;
     flex-shrink: 0;
     transition: all 0.2s ease;
 }
