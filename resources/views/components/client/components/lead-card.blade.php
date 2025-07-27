@@ -11,8 +11,10 @@
             icon="heroicon-m-document-text"
             wire:click="openNotesModal({{ $lead['id'] }})"
             tooltip="{{ $this->leadTooltips[$lead['id']] ?? 'Click to add notes' }}"
-            size="sm"
-            color="gray"
+            label="Edit notes for {{ $lead['name'] }}"
+            color="{{ !empty($lead['notes']) ? 'success' : 'primary' }}"
+            :badge="!empty($lead['notes']) ? 'Notes' : null"
+            badgeColor="success"
         />
         <button class="action-btn drag-handle" title="Drag to move">
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
