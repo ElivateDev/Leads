@@ -242,4 +242,31 @@ class LeadBoard extends Page
         $user = Filament::auth()->user();
         $user->setPreference('leadboard_column_order', $this->columnOrder);
     }
+
+    public function toggleDisposition(string $dispositionKey): void
+    {
+        if (in_array($dispositionKey, $this->visibleDispositions)) {
+            // Remove from visible dispositions
+            $this->visibleDispositions = array_filter(
+                $this->visibleDispositions,
+                fn($key) => $key !== $dispositionKey
+            );
+        } else {
+            // Add to visible dispositions
+            $this->visibleDispositions[] = $dispositionKey;
+        }
+
+        // Re-index array to ensure clean indexes
+        $this->visibleDispositions = array_values($this->visibleDispositions);
+    }
+
+    public function selectAllDispositions(): void
+    {
+        $this->visibleDispositions = array_keys($this->dispositions);
+    }
+
+    public function selectNoneDispositions(): void
+    {
+        $this->visibleDispositions = [];
+    }
 }
