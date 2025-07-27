@@ -7,108 +7,24 @@ let visibleDispositions = [];
 let columnOrder = [];
 let draggedColumn = null;
 let dropIndicator = null;
-let currentLeadId = null;
-let filterPanelOpen = false; // Pure client-side state for filter panel
+let filterPanelOpen = false;
 
-// Helper function to safely call Livewire methods
-function safeLivewireCall(method, ...args) {
-    try {
-        if (typeof Livewire === 'undefined' || !Livewire.find) {
-            console.warn('Livewire not available, skipping call to:', method);
-            return Promise.reject(new Error('Livewire not available'));
-        }
-
-        const wireElement = document.querySelector('[wire\\:id]');
-        if (!wireElement) {
-            console.warn('No Livewire component found in DOM');
-            return Promise.reject(new Error('No Livewire component found'));
-        }
-
-        const wireId = wireElement.getAttribute('wire:id');
-        const component = Livewire.find(wireId);
-
-        if (!component || !component.call) {
-            console.warn('Livewire component not found or method not available');
-            return Promise.reject(new Error('Livewire component not available'));
-        }
-
-        return component.call(method, ...args);
-    } catch (error) {
-        console.warn(`Failed to call Livewire method ${method}:`, error);
-        return Promise.reject(error);
+function getLivewireComponent() {
+    const wireElement = document.querySelector('[wire\\:id]');
+    if (wireElement) {
+        return Livewire.find(wireElement.getAttribute('wire:id'));
     }
+    return null;
 }
 
-// Wait for Livewire to be ready
-function waitForLivewire(callback, maxAttempts = 50) {
-    let attempts = 0;
-
-    function checkLivewire() {
-        attempts++;
-
-        if (typeof Livewire !== 'undefined' && Livewire.find) {
-            const wireElement = document.querySelector('[wire\\:id]');
-            if (wireElement) {
-                const wireId = wireElement.getAttribute('wire:id');
-                const component = Livewire.find(wireId);
-
-                if (component && component.call) {
-                    callback();
-                    return;
-                }
-            }
-        }
-
-        if (attempts < maxAttempts) {
-            setTimeout(checkLivewire, 100); // Check every 100ms
-        } else {
-            console.warn('Livewire not ready after maximum attempts, proceeding without it');
-            callback();
-        }
-    }
-
-    checkLivewire();
-}
-
-// Notes Modal Functions
-function openNotesModal(leadId, leadName, currentNotes) {
-    currentLeadId = leadId;
-    document.getElementById('notes-modal-title').textContent = `Notes for ${leadName}`;
-    document.getElementById('notes-textarea').value = currentNotes || '';
-    document.getElementById('notes-modal').classList.add('show');
-
-    // Focus on textarea after modal animation
-    setTimeout(() => {
-        document.getElementById('notes-textarea').focus();
-    }, 200);
-}
-
-function closeNotesModal() {
-    document.getElementById('notes-modal').classList.remove('show');
-    currentLeadId = null;
-}
-
-function saveNotes() {
-    if (!currentLeadId) return;
-
-    const notes = document.getElementById('notes-textarea').value;
-
-    safeLivewireCall('updateLeadNotes', currentLeadId, notes);
-    closeNotesModal();
-}
-
-// Initialize drag and drop functionality
 function initializeDragAndDrop() {
-    // Make sure all lead cards are draggable
     document.querySelectorAll('.lead-card').forEach(card => {
         card.draggable = true;
     });
 }
 
-// Initialize filter functionality
 function initializeFilters() {
-    const savedPanelState = localStorage.getItem('leadboard-filter-panel-open');
-    filterPanelOpen = savedPanelState !== 'false';
+    filterPanelOpen = window.initialFilterPanelOpen !== undefined ? window.initialFilterPanelOpen : true;
 
     const filterOptions = document.getElementById('filter-options');
     const toggleIcon = document.querySelector('.filter-toggle-icon');
@@ -118,10 +34,7 @@ function initializeFilters() {
         if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
     }
 
-    const saved = localStorage.getItem('leadboard-visible-dispositions');
-    if (saved) {
-        visibleDispositions = JSON.parse(saved);
-    } else if (window.initialVisibleDispositions) {
+    if (window.initialVisibleDispositions) {
         visibleDispositions = window.initialVisibleDispositions;
     } else {
         visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
@@ -134,16 +47,10 @@ function initializeFilters() {
     updateFilterDisplay();
     updateColumnVisibilityOnly();
     updateScrollIndicator();
-    initializeFilterStateProtection();
 }
 
-// Initialize column ordering on page load
 function initializeColumnOrderOnLoad() {
-    const savedOrder = localStorage.getItem('leadboard-column-order');
-    if (savedOrder) {
-        columnOrder = JSON.parse(savedOrder);
-        applyColumnOrder();
-    } else if (window.initialColumnOrder) {
+    if (window.initialColumnOrder) {
         columnOrder = window.initialColumnOrder;
         applyColumnOrder();
     } else {
@@ -153,43 +60,6 @@ function initializeColumnOrderOnLoad() {
     }
 }
 
-// Restore column order after lead drop
-function restoreColumnOrder() {
-    if (window.columnOrderBeforeDrop) {
-        const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
-
-        columnOrder = window.columnOrderBeforeDrop;
-        const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-
-        if (needsReordering) {
-            applyColumnOrder();
-        }
-
-        window.columnOrderBeforeDrop = null;
-    }
-}
-
-// Initialize column ordering (for restoration after updates)
-function initializeColumnOrder() {
-    if (window.columnOrderBeforeDrop) {
-        const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-            col.dataset.disposition
-        );
-
-        columnOrder = window.columnOrderBeforeDrop;
-        const needsReordering = !currentOrder.every((disposition, index) => disposition === columnOrder[index]);
-
-        if (needsReordering) {
-            applyColumnOrder();
-        }
-
-        window.columnOrderBeforeDrop = null;
-    }
-}
-
-// Apply column order to DOM
 function applyColumnOrder() {
     const columnsContainer = document.getElementById('disposition-columns');
     if (!columnsContainer) return;
@@ -220,16 +90,14 @@ function applyColumnOrder() {
     }, 50);
 }
 
-// Save column order to localStorage and database
 function saveColumnOrder() {
     const columns = Array.from(document.querySelectorAll('.disposition-column'));
     columnOrder = columns.map(col => col.dataset.disposition);
 
-    localStorage.setItem('leadboard-column-order', JSON.stringify(columnOrder));
-    safeLivewireCall('updateColumnOrder', columnOrder);
+    // Directly set the Livewire property instead of calling a method
+    getLivewireComponent()?.set('columnOrder', columnOrder);
 }
 
-// Show drop indicator for column reordering
 function showDropIndicator(targetColumn, isAfter) {
     hideDropIndicator();
 
@@ -245,7 +113,6 @@ function showDropIndicator(targetColumn, isAfter) {
     targetColumn.appendChild(dropIndicator);
 }
 
-// Hide drop indicator
 function hideDropIndicator() {
     if (dropIndicator) {
         dropIndicator.remove();
@@ -253,25 +120,14 @@ function hideDropIndicator() {
     }
 }
 
-// Update scroll indicator
 function updateScrollIndicator() {
     const columnsContainer = document.getElementById('disposition-columns');
     if (columnsContainer) {
-        const hasScroll = columnsContainer.scrollWidth > columnsContainer.clientWidth;
-
-        // Disabled scroll indicator classes to prevent fade effect
-        // if (hasScroll) {
-        //     columnsContainer.classList.add('has-scroll');
-        // } else {
-        //     columnsContainer.classList.remove('has-scroll');
-        // }
-
         // Update scroll navigation visibility
         updateScrollNavigation();
     }
 }
 
-// Update scroll navigation
 function updateScrollNavigation() {
     const columnsContainer = document.getElementById('disposition-columns');
     const scrollNavigation = document.getElementById('scroll-navigation');
@@ -292,26 +148,11 @@ function updateScrollNavigation() {
 
         scrollLeftBtn.disabled = scrollLeft <= 0;
         scrollRightBtn.disabled = scrollLeft >= maxScrollLeft;
-
-        updateVisibleColumnsInfo();
     } else {
         scrollNavigation.style.display = 'none';
     }
 }
 
-// Update visible columns info
-function updateVisibleColumnsInfo() {
-    const infoElement = document.getElementById('visible-columns-info');
-    const visibleColumns = Array.from(document.querySelectorAll('.disposition-column')).filter(col =>
-        col.style.display !== 'none'
-    );
-
-    if (infoElement) {
-        infoElement.textContent = `Showing ${visibleColumns.length} columns`;
-    }
-}
-
-// Scroll columns left or right
 function scrollColumns(direction) {
     const columnsContainer = document.getElementById('disposition-columns');
     if (!columnsContainer) return;
@@ -331,7 +172,6 @@ function scrollColumns(direction) {
     }
 }
 
-// Scroll to specific page
 function scrollToPage(pageIndex) {
     const columnsContainer = document.getElementById('disposition-columns');
     if (!columnsContainer) return;
@@ -345,9 +185,7 @@ function scrollToPage(pageIndex) {
     });
 }
 
-// Update filter display
 function updateFilterDisplay() {
-    // Update checkbox states
     document.querySelectorAll('.filter-checkbox').forEach(checkbox => {
         const dispositionKey = checkbox.id.replace('checkbox-', '');
         const isVisible = visibleDispositions.includes(dispositionKey);
@@ -355,13 +193,11 @@ function updateFilterDisplay() {
         if (isVisible) {
             checkbox.classList.add('checked');
         } else {
-            // Explicitly remove the checked class to ensure it's unchecked
             checkbox.classList.remove('checked');
         }
     });
 }
 
-// Update column visibility based on filters (without database save)
 function updateColumnVisibilityOnly() {
     // Show/hide columns based on filter
     document.querySelectorAll('.disposition-column').forEach(column => {
@@ -390,143 +226,66 @@ function toggleDisposition(dispositionKey) {
         visibleDispositions.push(dispositionKey);
     }
 
-    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
     updateFilterDisplay();
     updateColumnVisibilityOnly();
+
+    if (toggleDisposition.timeout) {
+        clearTimeout(toggleDisposition.timeout);
+    }
+    toggleDisposition.timeout = setTimeout(() => {
+        // Directly set the Livewire property instead of calling a method
+        getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
+    }, 500);
 }
 
-// Select all dispositions
 function selectAllDispositions() {
     visibleDispositions = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
         col.dataset.disposition
     );
 
-    // Save to localStorage immediately for instant persistence
-    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
-
     updateFilterDisplay();
     updateColumnVisibilityOnly();
 
-    // Don't save to database automatically - only on page unload
-    // saveFilterStateToDatabase();
+    if (toggleDisposition.timeout) {
+        clearTimeout(toggleDisposition.timeout);
+    }
+    // Directly set the Livewire property instead of calling a method
+    getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
 }
 
-// Select no dispositions
 function selectNoneDispositions() {
     visibleDispositions = [];
 
-    // Save to localStorage immediately for instant persistence
-    localStorage.setItem('leadboard-visible-dispositions', JSON.stringify(visibleDispositions));
-
     updateFilterDisplay();
     updateColumnVisibilityOnly();
-
-    // Don't save to database automatically - only on page unload
-    // saveFilterStateToDatabase();
+    // Directly set the Livewire property instead of calling a method
+    getLivewireComponent()?.set('visibleDispositions', visibleDispositions);
 }
 
-// Save filter state to database (delayed, non-blocking)
-function saveFilterStateToDatabase() {
-    // Use a debounced approach to avoid too many database calls
-    if (saveFilterStateToDatabase.timeout) {
-        clearTimeout(saveFilterStateToDatabase.timeout);
-    }
-
-    saveFilterStateToDatabase.timeout = setTimeout(() => {
-        safeLivewireCall('updateVisibleDispositions', visibleDispositions);
-    }, 2000); // Save 2 seconds after last change
-}
-
-// Toggle filter panel - pure client-side, no Livewire needed
 function toggleFilterPanel() {
     const filterOptions = document.getElementById('filter-options');
     const toggleIcon = document.querySelector('.filter-toggle-icon');
 
-    // Toggle our client-side state
     filterPanelOpen = !filterPanelOpen;
 
-    // Update the UI based on our state
     if (filterPanelOpen) {
         filterOptions.style.display = 'grid';
         if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
-
-        // Save state to localStorage for persistence
-        localStorage.setItem('leadboard-filter-panel-open', 'true');
     } else {
         filterOptions.style.display = 'none';
         if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
-
-        // Save state to localStorage for persistence
-        localStorage.setItem('leadboard-filter-panel-open', 'false');
-
-        // Don't save filter state to database when panel closes - only on page unload
-        // saveFilterStateToDatabase();
     }
+
+    // Directly set the Livewire property instead of calling a method
+    getLivewireComponent()?.set('filterPanelOpen', filterPanelOpen);
 }
 
-// Initialize filter event listeners
 function initializeFilterEventListeners() {
-    // Simple event delegation approach
     const filterPanel = document.querySelector('.filter-panel');
     if (!filterPanel) return;
 
-    // Remove any existing click listener on filter panel
     filterPanel.removeEventListener('click', handleFilterPanelClick);
-
-    // Add single click listener to filter panel
     filterPanel.addEventListener('click', handleFilterPanelClick);
-}
-
-// Protect filter state from DOM changes
-function initializeFilterStateProtection() {
-    // Watch for changes to the filter panel that might reset our state
-    const filterPanel = document.querySelector('.filter-panel');
-    if (!filterPanel) return;
-
-    const observer = new MutationObserver(function(mutations) {
-        let shouldRestoreState = false;
-
-        mutations.forEach(function(mutation) {
-            // Check if filter checkboxes were modified
-            if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                const target = mutation.target;
-                if (target.classList && (target.classList.contains('filter-panel') ||
-                    target.classList.contains('filter-options') ||
-                    target.classList.contains('filter-checkbox'))) {
-                    shouldRestoreState = true;
-                }
-            }
-        });
-
-        if (shouldRestoreState) {
-            // Restore filter state after a brief delay
-            setTimeout(() => {
-                // Restore filter selections
-                updateFilterDisplay();
-                updateColumnVisibilityOnly();
-
-                // Restore panel open/closed state
-                const filterOptions = document.getElementById('filter-options');
-                const toggleIcon = document.querySelector('.filter-toggle-icon');
-
-                if (filterPanelOpen) {
-                    filterOptions.style.display = 'grid';
-                    if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
-                } else {
-                    filterOptions.style.display = 'none';
-                    if (toggleIcon) toggleIcon.style.transform = 'rotate(-90deg)';
-                }
-            }, 10);
-        }
-    });
-
-    // Observe the entire filter panel for changes
-    observer.observe(filterPanel, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class']
-    });
 }
 
 // Handle all filter panel clicks in one place
@@ -542,7 +301,6 @@ function handleFilterPanelClick(e) {
         const dispositionKey = filterOption.dataset.disposition;
         toggleDisposition(dispositionKey);
 
-        // No need to worry about panel state - it's managed purely client-side now
         return;
     }
 
@@ -573,21 +331,6 @@ function handleFilterPanelClick(e) {
 
 // Event Listeners
 
-// Modal event listeners
-document.addEventListener('click', function(e) {
-    const modal = document.getElementById('notes-modal');
-    if (e.target === modal) {
-        closeNotesModal();
-    }
-});
-
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && document.getElementById('notes-modal').classList.contains('show')) {
-        closeNotesModal();
-    }
-});
-
-// Drag and drop event listeners
 document.addEventListener('dragstart', function(e) {
     // Check if we're dragging a column (from the drag handle)
     if (e.target.closest('.column-drag-handle')) {
@@ -714,34 +457,13 @@ document.addEventListener('drop', function(e) {
 
         // Update lead disposition via Livewire
         if (draggedLeadId && newDisposition) {
-            const currentOrder = Array.from(document.querySelectorAll('.disposition-column')).map(col =>
-                col.dataset.disposition
-            );
-            window.columnOrderBeforeDrop = currentOrder;
-
-            safeLivewireCall('updateLeadDisposition', draggedLeadId, newDisposition)
-                .then(() => {
-                    setTimeout(() => {
-                        restoreColumnOrder();
-                    }, 200);
-                })
-                .catch((error) => {
-                    setTimeout(() => {
-                        restoreColumnOrder();
-                    }, 200);
-                });
+            getLivewireComponent()?.call('updateLeadDisposition', draggedLeadId, newDisposition);
         }
     }
 });
 
-// Livewire event listeners - only reinitialize drag and drop, filters are pure client-side
 document.addEventListener('livewire:updated', function(event) {
     setTimeout(() => {
-        if (window.restoreColumnOrderAfterUpdate) {
-            initializeColumnOrder();
-            window.restoreColumnOrderAfterUpdate = false;
-        }
-
         initializeDragAndDrop();
         updateScrollIndicator();
         updateFilterDisplay();
@@ -749,22 +471,12 @@ document.addEventListener('livewire:updated', function(event) {
     }, 100);
 });
 
-// Window resize listener
 window.addEventListener('resize', function() {
     setTimeout(() => {
         updateScrollIndicator();
     }, 100);
 });
 
-// Save filter state when page unloads
-window.addEventListener('beforeunload', function() {
-    if (saveFilterStateToDatabase.timeout) {
-        clearTimeout(saveFilterStateToDatabase.timeout);
-    }
-    safeLivewireCall('updateVisibleDispositions', visibleDispositions);
-});
-
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeDragAndDrop();
     initializeFilters();
