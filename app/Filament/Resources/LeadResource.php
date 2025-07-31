@@ -152,6 +152,16 @@ class LeadResource extends Resource
                     ]),
                 Tables\Filters\SelectFilter::make('client')
                     ->relationship('client', 'name'),
+                Tables\Filters\SelectFilter::make('campaign')
+                    ->label('Campaign')
+                    ->options(function () {
+                        return Lead::whereNotNull('campaign')
+                            ->where('campaign', '!=', '')
+                            ->distinct()
+                            ->pluck('campaign', 'campaign')
+                            ->toArray();
+                    })
+                    ->placeholder('All Campaigns'),
             ])
             ->actions([
                 Tables\Actions\Action::make('copy_to_client')
