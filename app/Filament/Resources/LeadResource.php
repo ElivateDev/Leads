@@ -126,6 +126,7 @@ class LeadResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('campaign')
                     ->placeholder('No campaign')
+                    ->wrap()
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
@@ -153,6 +154,30 @@ class LeadResource extends Resource
                     ->relationship('client', 'name'),
             ])
             ->actions([
+                Tables\Actions\Action::make('copy_to_client')
+                    ->label('Copy to Client')
+                    ->icon('heroicon-m-document-duplicate')
+                    ->color('info')
+                    ->form([
+                        Forms\Components\Select::make('client_id')
+                            ->label('Target Client')
+                            ->relationship('client', 'name')
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Select the client to copy this lead to'),
+                    ])
+                    ->action(function (Lead $record, array $data): void {
+                        $newLead = $record->replicate();
+                        $newLead->client_id = $data['client_id'];
+                        $newLead->save();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Lead copied successfully')
+                            ->body("Lead '{$record->name}' has been copied to the selected client.")
+                            ->success()
+                            ->send();
+                    }),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
