@@ -65,4 +65,25 @@ class Lead extends Model
 
         return $rules;
     }
+
+    /**
+     * Find leads with matching contact information across other clients
+     */
+    public function findMatchingLeads()
+    {
+        $query = self::where('id', '!=', $this->id)
+            ->where('client_id', '!=', $this->client_id)
+            ->where('name', $this->name);
+
+        $query->where(function ($q) {
+            if ($this->email) {
+                $q->where('email', $this->email);
+            }
+            if ($this->phone) {
+                $q->orWhere('phone', $this->phone);
+            }
+        });
+
+        return $query->get();
+    }
 }

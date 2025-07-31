@@ -281,7 +281,91 @@ class LeadObserver
      */
     public function updated(Lead $lead): void
     {
-        //
+        // Check if the status was changed
+        if ($lead->isDirty('status')) {
+            $this->updateMatchingLeadsStatus($lead);
+        }
+    }
+
+    /**
+     * Update status for leads with matching contact information across other clients
+     */
+    private function updateMatchingLeadsStatus(Lead $lead): void
+    {
+        try {
+            Log::info('Updating status for matching leads', [
+                'lead_id' => $lead->id,
+                'new_status' => $lead->status,
+                'name' => $lead->name,
+                'email' => $lead->email,
+                'phone' => $lead->phone,
+            ]);
+
+            // Build query to find matching leads in other clients
+            $query = Lead::where('id', '!=', $lead->id) // Exclude current lead
+                ->where('client_id', '!=', $lead->client_id); // Exclude same client
+
+            // Match on name (required) plus either email or phone
+            $query->where('name', $lead->name);
+
+            $query->where(function ($q) use ($lead) {
+                if ($lead->email) {
+                    $q->where('email', $lead->email);
+                }
+                if ($lead->phone) {
+                    $q->orWhere('phone', $lead->phone);
+                }
+            });
+
+            $matchingLeads = $query->get();
+
+            if ($matchingLeads->isEmpty()) {
+                Log::info('No matching leads found for status update');
+                return;
+            }
+
+            $updatedCount = 0;
+            foreach ($matchingLeads as $matchingLead) {
+                // Check if the target client has this status in their dispositions
+                $client = $matchingLead->client;
+                $availableStatuses = array_keys($client->getLeadDispositions());
+
+                if (in_array($lead->status, $availableStatuses)) {
+                    $oldStatus = $matchingLead->status;
+                    $matchingLead->status = $lead->status;
+                    $matchingLead->save();
+                    $updatedCount++;
+
+                    Log::info('Updated matching lead status', [
+                        'lead_id' => $matchingLead->id,
+                        'client_id' => $matchingLead->client_id,
+                        'client_name' => $client->name,
+                        'old_status' => $oldStatus,
+                        'new_status' => $lead->status,
+                    ]);
+                } else {
+                    Log::info('Skipping lead - status not available for client', [
+                        'lead_id' => $matchingLead->id,
+                        'client_id' => $matchingLead->client_id,
+                        'client_name' => $client->name,
+                        'attempted_status' => $lead->status,
+                        'available_statuses' => $availableStatuses,
+                    ]);
+                }
+            }
+
+            Log::info('Completed matching leads status update', [
+                'total_found' => $matchingLeads->count(),
+                'total_updated' => $updatedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error updating matching leads status', [
+                'lead_id' => $lead->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
     }
 
     /**
