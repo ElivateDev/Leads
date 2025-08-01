@@ -83,8 +83,8 @@ class EmailLeadProcessor
             Log::info('IMAP connection successful');
 
             // Get all emails (not just unseen) for debugging
-            $allMails = imap_search($imapConnection, 'ALL', SE_UID);
-            $unseenMails = imap_search($imapConnection, 'UNSEEN', SE_UID);
+            $allMails = imap_search($imapConnection, 'ALL');
+            $unseenMails = imap_search($imapConnection, 'UNSEEN');
             $mailIds = $unseenMails ? $unseenMails : [];
 
             Log::info('Email inbox status', [
@@ -181,7 +181,7 @@ class EmailLeadProcessor
                     ];
 
                     // Mark as seen (use @ to suppress PHP warnings for IMAP errors)
-                    $markResult = @imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
+                    $markResult = @imap_setflag_full($imapConnection, $mailId, "\\Seen");
                     if (!$markResult) {
                         $lastError = imap_last_error();
                         if (strpos($lastError, 'Bad message number') !== false) {
@@ -364,7 +364,7 @@ class EmailLeadProcessor
             }
 
             // Get recent emails for debugging
-            $recentMails = imap_search($imapConnection, 'SINCE "' . date('d-M-Y', strtotime('-7 days')) . '"', SE_UID);
+            $recentMails = imap_search($imapConnection, 'SINCE "' . date('d-M-Y', strtotime('-7 days')) . '"');
             if ($recentMails) {
                 $recentEmails = [];
                 foreach (array_slice($recentMails, -10) as $mailId) {
