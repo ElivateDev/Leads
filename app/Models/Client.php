@@ -85,7 +85,26 @@ class Client extends Model
     {
         // If notification_emails is set and not empty, use it
         if (!empty($this->notification_emails)) {
-            return $this->notification_emails;
+            // Handle both formats: array of strings or array of objects with 'email' property
+            $emails = [];
+            foreach ($this->notification_emails as $item) {
+                if (is_string($item)) {
+                    // Simple string format
+                    $emails[] = $item;
+                } elseif (is_array($item) && isset($item['email'])) {
+                    // Object format from Filament Repeater
+                    $emails[] = $item['email'];
+                }
+            }
+
+            // Filter out empty emails
+            $emails = array_filter($emails, function ($email) {
+                return !empty(trim($email));
+            });
+
+            if (!empty($emails)) {
+                return array_values($emails); // Reindex array
+            }
         }
 
         // Otherwise, fall back to the primary email
