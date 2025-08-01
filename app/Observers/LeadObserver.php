@@ -38,9 +38,44 @@ class LeadObserver
                     return;
                 }
 
+                // Filter notification emails based on campaign preferences
+                $filteredEmails = [];
+                foreach ($notificationEmails as $email) {
+                    // Check if there's a user with this email address
+                    $user = \App\Models\User::where('email', $email)
+                        ->where('client_id', $lead->client_id)
+                        ->first();
+
+                    if ($user) {
+                        // Apply campaign filtering for this user
+                        if ($user->shouldNotifyForCampaign($lead->campaign)) {
+                            $filteredEmails[] = $email;
+                        } else {
+                            Log::info('Skipping notification due to campaign preferences', [
+                                'user_email' => $email,
+                                'lead_campaign' => $lead->campaign,
+                                'user_notification_campaigns' => $user->getNotificationCampaigns(),
+                            ]);
+                        }
+                    } else {
+                        // If no user found, send notification (default behavior for email-only recipients)
+                        $filteredEmails[] = $email;
+                    }
+                }
+
+                if (empty($filteredEmails)) {
+                    Log::info('No notifications sent due to campaign filtering', [
+                        'lead_campaign' => $lead->campaign,
+                        'original_emails' => $notificationEmails,
+                    ]);
+                    return;
+                }
+
                 Log::info('Starting email notification process', [
-                    'notification_emails' => $notificationEmails,
-                    'total_recipients' => count($notificationEmails),
+                    'notification_emails' => $filteredEmails,
+                    'total_recipients' => count($filteredEmails),
+                    'original_recipients' => count($notificationEmails),
+                    'filtered_by_campaign' => $lead->campaign,
                     'smtp_host' => config('mail.mailers.smtp.host'),
                     'smtp_port' => config('mail.mailers.smtp.port'),
                     'smtp_username' => config('mail.mailers.smtp.username'),
@@ -53,7 +88,7 @@ class LeadObserver
                 $successfulSends = [];
                 $failedSends = [];
 
-                foreach ($notificationEmails as $email) {
+                foreach ($filteredEmails as $email) {
                     try {
                         // Validate recipient email before sending
                         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

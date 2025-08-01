@@ -122,7 +122,7 @@ class LeadResource extends Resource
                         'phone' => 'info',
                         'referral' => 'warning',
                         'social' => 'danger',
-                        'other' => 'gray',
+                        default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('campaign')
                     ->placeholder('No campaign')

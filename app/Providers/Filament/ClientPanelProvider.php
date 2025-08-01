@@ -41,6 +41,7 @@ class ClientPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Client\Pages\Dashboard::class,
                 \App\Filament\Client\Pages\LeadBoard::class,
+                \App\Filament\Client\Pages\CampaignPreferences::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Client/Widgets'), for: 'App\\Filament\\Client\\Widgets')
             ->widgets([
@@ -57,6 +58,10 @@ class ClientPanelProvider extends PanelProvider
                     ->label('Settings')
                     ->url(fn(): string => \App\Filament\Client\Resources\ClientResource::getUrl('index'))
                     ->icon('heroicon-o-cog-6-tooth'),
+                'campaign_preferences' => MenuItem::make()
+                    ->label('Campaign Preferences')
+                    ->url(fn(): string => \App\Filament\Client\Pages\CampaignPreferences::getUrl())
+                    ->icon('heroicon-o-funnel'),
                 'change_password' => MenuItem::make()
                     ->label('Change Password')
                     ->url(fn(): string => filament()->getProfileUrl())

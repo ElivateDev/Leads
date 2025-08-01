@@ -27,9 +27,20 @@ class LeadResource extends Resource
     {
         // Only show leads for the authenticated client user's client
         $user = Filament::auth()->user();
-
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('client_id', $user->client_id);
+
+        // Apply campaign visibility filter
+        $visibleCampaigns = $user->getVisibleCampaigns();
+        if (!empty($visibleCampaigns)) {
+            $query->where(function (Builder $q) use ($visibleCampaigns) {
+                $q->whereIn('campaign', $visibleCampaigns)
+                    ->orWhereNull('campaign') // Always show leads without campaigns
+                    ->orWhere('campaign', '');
+            });
+        }
+
+        return $query;
     }
 
     public static function form(Form $form): Form

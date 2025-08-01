@@ -143,4 +143,58 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->getPreference('admin_notify_rules_not_matched', false);
     }
+
+    /**
+     * Get the campaigns this user can view
+     */
+    public function getVisibleCampaigns(): array
+    {
+        return $this->getPreference('visible_campaigns', []);
+    }
+
+    /**
+     * Get the campaigns this user wants notifications for
+     */
+    public function getNotificationCampaigns(): array
+    {
+        return $this->getPreference('notification_campaigns', []);
+    }
+
+    /**
+     * Check if user should see a specific campaign
+     */
+    public function canViewCampaign(?string $campaign): bool
+    {
+        if (empty($campaign)) {
+            return true; // Always show leads without campaigns
+        }
+
+        $visibleCampaigns = $this->getVisibleCampaigns();
+
+        // If no preferences set, show all campaigns
+        if (empty($visibleCampaigns)) {
+            return true;
+        }
+
+        return in_array($campaign, $visibleCampaigns);
+    }
+
+    /**
+     * Check if user should receive notifications for a specific campaign
+     */
+    public function shouldNotifyForCampaign(?string $campaign): bool
+    {
+        if (empty($campaign)) {
+            return true; // Always notify for leads without campaigns
+        }
+
+        $notificationCampaigns = $this->getNotificationCampaigns();
+
+        // If no preferences set, notify for all campaigns
+        if (empty($notificationCampaigns)) {
+            return true;
+        }
+
+        return in_array($campaign, $notificationCampaigns);
+    }
 }
