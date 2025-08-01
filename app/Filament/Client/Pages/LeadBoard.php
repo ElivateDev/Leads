@@ -9,6 +9,7 @@ use Filament\Facades\Filament;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Computed;
 use Filament\Notifications\Notification;
+use Illuminate\Database\Eloquent\Builder;
 
 class LeadBoard extends Page
 {
@@ -66,9 +67,19 @@ class LeadBoard extends Page
 
         $this->dispositions = $client->getLeadDispositions();
 
-        $leads = Lead::where('client_id', $user->client_id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $leadsQuery = Lead::where('client_id', $user->client_id);
+
+        // Apply campaign visibility filter
+        $visibleCampaigns = $user->getVisibleCampaigns();
+        if (!empty($visibleCampaigns)) {
+            $leadsQuery->where(function (Builder $q) use ($visibleCampaigns) {
+                $q->whereIn('campaign', $visibleCampaigns)
+                    ->orWhereNull('campaign') // Always show leads without campaigns
+                    ->orWhere('campaign', '');
+            });
+        }
+
+        $leads = $leadsQuery->orderBy('created_at', 'desc')->get();
 
         $this->leads = $leads->groupBy('status')->toArray();
 

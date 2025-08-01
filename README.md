@@ -20,10 +20,17 @@ A Laravel-based CRM application that automatically processes emails to generate 
 -   **Admin Interface**: Modern admin panel built with Filament for easy management
 -   **Admin Notifications**: Configurable email notifications for administrators about system events:
     -   Email processing success/failure notifications
-    -   Error alerts for SMTP, IMAP, and processing issues  
+    -   Error alerts for SMTP, IMAP, and processing issues
     -   Alerts when no client rules match incoming emails
     -   Duplicate lead detection notifications
     -   Individual notification preferences per admin user
+-   **Campaign Filtering System**: Advanced filtering system for leads based on campaign preferences:
+    -   **User Campaign Preferences**: Each user can select which campaigns they want to view and receive notifications for
+    -   **Client Portal Access**: Campaign preferences accessible via user avatar dropdown menu in client panel
+    -   **Admin Management**: Admin resource for managing user campaign preferences across the organization
+    -   **Automatic Filtering**: Lead lists and dashboards automatically filter based on user preferences
+    -   **Notification Filtering**: Email notifications only sent for campaigns user has opted into
+    -   **Flexible Configuration**: Supports campaigns from both lead data and campaign rules
 -   **User Impersonation**: Admins can securely log into the client portal as any client user without password changes, with full audit logging
 -   **Notifications**: Automatic email notifications to clients when new leads are received
 -   **Multiple Lead Sources**: Support for leads from website, phone, referral, social media, and other sources
