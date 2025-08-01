@@ -102,15 +102,66 @@ class EmailLeadProcessor
                     echo "Processing email ID: $mailId\n";
                     Log::info('Processing email', ['mail_id' => $mailId]);
 
-                    $header = imap_headerinfo($imapConnection, $mailId);
+                    // Check if the message still exists before trying to access it
+                    $header = @imap_headerinfo($imapConnection, $mailId);
                     if (!$header) {
-                        Log::warning('Failed to get header info for email', ['mail_id' => $mailId]);
+                        $lastError = imap_last_error();
+                        if (strpos($lastError, 'Bad message number') !== false) {
+                            Log::info('Email message no longer exists (likely deleted or moved)', [
+                                'mail_id' => $mailId,
+                                'imap_error' => $lastError
+                            ]);
+                            
+                            // Log this as a routine IMAP issue in the processing log
+                            EmailProcessingLogger::logEvent(
+                                (string) $mailId,
+                                'imap_issue',
+                                'skipped',
+                                'Email message no longer exists (deleted/moved during processing)',
+                                [
+                                    'imap_error' => $lastError,
+                                    'error_type' => 'bad_message_number'
+                                ]
+                            );
+                            
+                            echo "  ✓ Email ID $mailId no longer exists (deleted/moved), skipping\n";
+                            continue;
+                        }
+                        Log::warning('Failed to get header info for email', [
+                            'mail_id' => $mailId,
+                            'imap_error' => $lastError
+                        ]);
                         continue;
                     }
 
-                    $body = imap_body($imapConnection, $mailId);
+                    $body = @imap_body($imapConnection, $mailId);
                     if ($body === false) {
-                        Log::warning('Failed to get body for email', ['mail_id' => $mailId]);
+                        $lastError = imap_last_error();
+                        if (strpos($lastError, 'Bad message number') !== false) {
+                            Log::info('Email message no longer exists when reading body', [
+                                'mail_id' => $mailId,
+                                'imap_error' => $lastError
+                            ]);
+                            
+                            // Log this as a routine IMAP issue in the processing log
+                            EmailProcessingLogger::logEvent(
+                                (string) $mailId,
+                                'imap_issue',
+                                'skipped',
+                                'Email message no longer exists when reading body',
+                                [
+                                    'imap_error' => $lastError,
+                                    'error_type' => 'bad_message_number'
+                                ]
+                            );
+                            
+                            echo "  ✓ Email ID $mailId no longer exists (deleted/moved), skipping\n";
+                            continue;
+                        }
+                        Log::warning('Failed to get body for email', [
+                            'mail_id' => $mailId,
+                            'imap_error' => $lastError
+                        ]);
                         $body = '';
                     }
 
@@ -129,10 +180,21 @@ class EmailLeadProcessor
                         'date' => isset($header->date) ? $header->date : null,
                     ];
 
-                    // Mark as seen
-                    $markResult = imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
+                    // Mark as seen (use @ to suppress PHP warnings for IMAP errors)
+                    $markResult = @imap_setflag_full($imapConnection, $mailId, "\\Seen", ST_UID);
                     if (!$markResult) {
-                        Log::warning('Failed to mark email as seen', ['mail_id' => $mailId]);
+                        $lastError = imap_last_error();
+                        if (strpos($lastError, 'Bad message number') !== false) {
+                            Log::info('Email message no longer exists when marking as seen', [
+                                'mail_id' => $mailId,
+                                'imap_error' => $lastError
+                            ]);
+                        } else {
+                            Log::warning('Failed to mark email as seen', [
+                                'mail_id' => $mailId,
+                                'imap_error' => $lastError
+                            ]);
+                        }
                     }
 
                     // Log that we received the email
@@ -163,14 +225,44 @@ class EmailLeadProcessor
                         ]);
                     }
                 } catch (\Exception $e) {
-                    Log::error('Error processing email ID ' . $mailId . ': ' . $e->getMessage(), [
+                    $errorMessage = $e->getMessage();
+                    
+                    // Check if this is a routine IMAP error that we should handle gracefully
+                    $isRoutineImapError = strpos($errorMessage, 'Bad message number') !== false ||
+                                         strpos($errorMessage, 'imap_headerinfo') !== false ||
+                                         strpos($errorMessage, 'imap_body') !== false;
+                    
+                    if ($isRoutineImapError) {
+                        Log::info('Routine IMAP error - email likely deleted/moved during processing', [
+                            'mail_id' => $mailId,
+                            'error' => $errorMessage
+                        ]);
+                        
+                        // Log this as a routine IMAP issue in the processing log
+                        EmailProcessingLogger::logEvent(
+                            (string) $mailId,
+                            'imap_issue',
+                            'skipped',
+                            'Routine IMAP error during processing: ' . $errorMessage,
+                            [
+                                'error_type' => 'routine_imap_error',
+                                'exception_message' => $errorMessage
+                            ]
+                        );
+                        
+                        echo "  ✓ Email ID $mailId no longer accessible (routine IMAP issue), skipping\n";
+                        continue; // Skip admin notification for routine IMAP issues
+                    }
+                    
+                    // For non-routine errors, log and send admin notification
+                    Log::error('Error processing email ID ' . $mailId . ': ' . $errorMessage, [
                         'mail_id' => $mailId,
-                        'exception' => $e->getMessage(),
+                        'exception' => $errorMessage,
                         'trace' => $e->getTraceAsString()
                     ]);
-                    echo "✗ Error processing email ID $mailId: " . $e->getMessage() . "\n";
+                    echo "✗ Error processing email ID $mailId: " . $errorMessage . "\n";
                     
-                    // Send admin notification for email processing error
+                    // Send admin notification for serious email processing errors only
                     $fromAddress = 'unknown';
                     $subject = 'Unknown Subject';
                     try {

@@ -104,6 +104,8 @@ class EmailProcessingLog extends Model
             'lead_created' => 'Lead Created',
             'lead_duplicate' => 'Duplicate Lead',
             'notification_sent' => 'Notification Sent',
+            'email_skipped' => 'Email Skipped',
+            'imap_issue' => 'IMAP Issue',
             'error' => 'Error',
             default => ucfirst($this->type),
         };
