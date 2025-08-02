@@ -36,7 +36,25 @@ class ClientResource extends Resource
                     ->tel(),
                 Forms\Components\TextInput::make('company'),
                 Forms\Components\Toggle::make('email_notifications')
-                    ->required(),
+                    ->required()
+                    ->live(),
+                Forms\Components\Repeater::make('notification_emails')
+                    ->label('Notification Email Addresses')
+                    ->helperText('Add email addresses that should receive notifications for new leads.')
+                    ->schema([
+                        Forms\Components\TextInput::make('email')
+                            ->label('Email Address')
+                            ->email()
+                            ->required()
+                            ->placeholder('user@example.com'),
+                    ])
+                    ->itemLabel(fn(array $state): ?string => $state['email'] ?? null)
+                    ->addActionLabel('Add Email Address')
+                    ->collapsible()
+                    ->cloneable()
+                    ->defaultItems(0)
+                    ->visible(fn(Forms\Get $get): bool => $get('email_notifications'))
+                    ->columnSpanFull(),
                 Forms\Components\KeyValue::make('lead_dispositions')
                     ->label('Lead Dispositions')
                     ->helperText('Define custom lead statuses for this client. Key is the value stored in database, Value is the display name.')
