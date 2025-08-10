@@ -7,6 +7,8 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Navigation\MenuItem;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Filament\Http\Middleware\Authenticate;
 use Illuminate\Session\Middleware\StartSession;
@@ -45,10 +47,10 @@ class ClientPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Client/Widgets'), for: 'App\\Filament\\Client\\Widgets')
             ->widgets([
-                \App\Filament\Client\Widgets\ImpersonationBanner::class,
                 \App\Filament\Client\Widgets\LeadStatsWidget::class,
             ])
             ->profile()
+            ->renderHook(PanelsRenderHook::TOPBAR_AFTER, fn(): View => view('client.impersonation-banner'))
             ->userMenuItems([
                 'profile' => MenuItem::make()
                     ->label(fn(): string => Auth::user()?->name ?? 'Guest')

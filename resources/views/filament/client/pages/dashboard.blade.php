@@ -1,7 +1,5 @@
 <x-filament-panels::page>
 
-    <x-impersonation-banner />
-
     <div class="space-y-6">
         <!-- Welcome Section -->
         <x-filament::section>
