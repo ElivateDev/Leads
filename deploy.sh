@@ -245,6 +245,11 @@ if git diff --name-only "$LOCAL" HEAD | grep -q "database/migrations"; then
     php artisan migrate --force >> "$LOG_FILE" 2>&1
 fi
 
+# Final optimization step - run after all other operations
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running final optimization" >> "$LOG_FILE"
+echo "Running Laravel optimization..."
+php artisan optimize >> "$LOG_FILE" 2>&1
+
 # Fix permissions (always run)
 fix_permissions
 
