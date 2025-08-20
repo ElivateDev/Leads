@@ -30,6 +30,7 @@ class ClientPanelProvider extends PanelProvider
             ->path('client')
             ->favicon(asset('images/favicon.png'))
             ->login()
+            ->passwordReset()
             ->authGuard('web')
             ->brandLogoHeight('2rem')
             ->sidebarCollapsibleOnDesktop()
