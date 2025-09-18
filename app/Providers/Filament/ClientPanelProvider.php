@@ -49,6 +49,7 @@ class ClientPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Client/Widgets'), for: 'App\\Filament\\Client\\Widgets')
             ->widgets([
                 \App\Filament\Client\Widgets\LeadStatsWidget::class,
+                \App\Filament\Client\Widgets\ClientLeadsCampaignChartWidget::class,
             ])
             ->profile()
             ->renderHook(PanelsRenderHook::TOPBAR_AFTER, fn(): View => view('client.impersonation-banner'))
