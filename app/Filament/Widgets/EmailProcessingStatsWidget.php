@@ -105,7 +105,7 @@ class EmailProcessingStatsWidget extends BaseWidget
         }
 
         $trend = $currentPeriod >= $previousPeriod ? 'increase' : 'decrease';
-        return "Leads created in the last 30 days ({$trend} from previous period)";
+        return "Leads created in the last 30 days ({$trend} from previous 30 days)";
     }
 
     private function getLeadsComparisonIcon($allTimeStats): string
@@ -259,7 +259,7 @@ class EmailProcessingStatsWidget extends BaseWidget
             ->count();
 
         $percentageChange = $this->calculatePercentageChange($currentPeriod, $previousPeriod);
-        
+
         return $currentPeriod . ($percentageChange !== null ? " ({$percentageChange})" : '');
     }
 
@@ -275,7 +275,7 @@ class EmailProcessingStatsWidget extends BaseWidget
             ->count();
 
         $percentageChange = $this->calculatePercentageChange($currentPeriod, $previousPeriod);
-        
+
         if ($percentageChange === null) {
             return 'Leads created in the last 7 days';
         }

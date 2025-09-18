@@ -89,6 +89,31 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Get the user's API tokens
+     */
+    public function apiTokens()
+    {
+        return $this->hasMany(ApiToken::class);
+    }
+
+    /**
+     * Create a new API token for this user
+     */
+    public function createApiToken(string $name, ?array $abilities = null, ?\DateTime $expiresAt = null): string
+    {
+        $token = ApiToken::generateToken();
+        
+        $this->apiTokens()->create([
+            'name' => $name,
+            'token' => hash('sha256', $token),
+            'abilities' => $abilities,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return $token;
+    }
+
+    /**
      * Get a specific preference value
      */
     public function getPreference(string $key, mixed $default = null): mixed
