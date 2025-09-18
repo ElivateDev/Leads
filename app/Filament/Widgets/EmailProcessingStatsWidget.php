@@ -59,6 +59,11 @@ class EmailProcessingStatsWidget extends BaseWidget
                 ->descriptionIcon($this->getLeadsComparisonIcon($allTimeStats))
                 ->color($this->getLeadsComparisonColor($allTimeStats)),
 
+            Stat::make('Leads Last 7 Days', $this->getLeadsLast7DaysWithComparison($allTimeStats))
+                ->description($this->getLeadsLast7DaysComparisonDescription($allTimeStats))
+                ->descriptionIcon($this->getLeadsLast7DaysComparisonIcon($allTimeStats))
+                ->color($this->getLeadsLast7DaysComparisonColor($allTimeStats)),
+
             Stat::make('Total Logs', $allTimeStats->count())
                 ->description('All-time processing log entries')
                 ->descriptionIcon('heroicon-m-document-text')
@@ -239,5 +244,83 @@ class EmailProcessingStatsWidget extends BaseWidget
         }
 
         return 'primary';
+    }
+
+    // 7-day comparison methods
+    private function getLeadsLast7DaysWithComparison($allTimeStats): string
+    {
+        $currentPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        $previousPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(14))
+            ->where('created_at', '<', now()->subDays(7))
+            ->count();
+
+        $percentageChange = $this->calculatePercentageChange($currentPeriod, $previousPeriod);
+        
+        return $currentPeriod . ($percentageChange !== null ? " ({$percentageChange})" : '');
+    }
+
+    private function getLeadsLast7DaysComparisonDescription($allTimeStats): string
+    {
+        $currentPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        $previousPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(14))
+            ->where('created_at', '<', now()->subDays(7))
+            ->count();
+
+        $percentageChange = $this->calculatePercentageChange($currentPeriod, $previousPeriod);
+        
+        if ($percentageChange === null) {
+            return 'Leads created in the last 7 days';
+        }
+
+        $trend = $currentPeriod >= $previousPeriod ? 'increase' : 'decrease';
+        return "Leads created in the last 7 days ({$trend} from previous week)";
+    }
+
+    private function getLeadsLast7DaysComparisonIcon($allTimeStats): string
+    {
+        $currentPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        $previousPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(14))
+            ->where('created_at', '<', now()->subDays(7))
+            ->count();
+
+        if ($currentPeriod > $previousPeriod) {
+            return 'heroicon-m-arrow-trending-up';
+        } elseif ($currentPeriod < $previousPeriod) {
+            return 'heroicon-m-arrow-trending-down';
+        }
+
+        return 'heroicon-m-minus';
+    }
+
+    private function getLeadsLast7DaysComparisonColor($allTimeStats): string
+    {
+        $currentPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        $previousPeriod = $allTimeStats->where('type', 'lead_created')
+            ->where('created_at', '>=', now()->subDays(14))
+            ->where('created_at', '<', now()->subDays(7))
+            ->count();
+
+        if ($currentPeriod > $previousPeriod) {
+            return 'success';
+        } elseif ($currentPeriod < $previousPeriod) {
+            return 'danger';
+        }
+
+        return 'info';
     }
 }
