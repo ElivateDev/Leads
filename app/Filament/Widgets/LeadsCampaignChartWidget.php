@@ -12,7 +12,7 @@ class LeadsCampaignChartWidget extends ChartWidget
 
     protected static ?int $sort = 3;
 
-    protected static ?string $maxHeight = '400px';
+    protected static ?string $maxHeight = '600px';
 
     protected function getData(): array
     {
@@ -64,7 +64,7 @@ class LeadsCampaignChartWidget extends ChartWidget
 
         $backgroundColors = [];
         $borderColors = [];
-        
+
         for ($i = 0; $i < count($labels); $i++) {
             $color = $colors[$i % count($colors)];
             $backgroundColors[] = $color . '20'; // Add transparency

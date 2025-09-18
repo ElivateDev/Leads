@@ -13,13 +13,13 @@ class ClientLeadsCampaignChartWidget extends ChartWidget
 
     protected static ?int $sort = 3;
 
-    protected static ?string $maxHeight = '400px';
+    protected static ?string $maxHeight = '600px';
 
     protected function getData(): array
     {
         // Get the authenticated user's client ID
         $clientId = Auth::user()->client_id;
-        
+
         if (!$clientId) {
             return [
                 'datasets' => [
@@ -83,7 +83,7 @@ class ClientLeadsCampaignChartWidget extends ChartWidget
 
         $backgroundColors = [];
         $borderColors = [];
-        
+
         for ($i = 0; $i < count($labels); $i++) {
             $color = $colors[$i % count($colors)];
             $backgroundColors[] = $color . '20'; // Add transparency
