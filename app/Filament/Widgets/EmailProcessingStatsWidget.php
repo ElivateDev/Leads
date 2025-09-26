@@ -3,12 +3,13 @@
 namespace App\Filament\Widgets;
 
 use App\Models\EmailProcessingLog;
+use App\Models\Lead;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class EmailProcessingStatsWidget extends BaseWidget
 {
-    protected static ?int $sort = 1;
+    protected static ?int $sort = 2;
 
     protected function getStats(): array
     {
@@ -73,12 +74,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsLast30DaysWithComparison($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(60))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(30))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(60))
             ->where('created_at', '<', now()->subDays(30))
             ->count();
 
@@ -89,12 +86,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsComparisonDescription($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(60))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(30))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(60))
             ->where('created_at', '<', now()->subDays(30))
             ->count();
 
@@ -110,12 +103,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsComparisonIcon($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(60))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(30))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(60))
             ->where('created_at', '<', now()->subDays(30))
             ->count();
 
@@ -130,12 +119,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsComparisonColor($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(60))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(30))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(60))
             ->where('created_at', '<', now()->subDays(30))
             ->count();
 
@@ -249,12 +234,8 @@ class EmailProcessingStatsWidget extends BaseWidget
     // 7-day comparison methods
     private function getLeadsLast7DaysWithComparison($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(14))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(7))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(14))
             ->where('created_at', '<', now()->subDays(7))
             ->count();
 
@@ -265,12 +246,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsLast7DaysComparisonDescription($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(14))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(7))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(14))
             ->where('created_at', '<', now()->subDays(7))
             ->count();
 
@@ -286,12 +263,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsLast7DaysComparisonIcon($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(14))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(7))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(14))
             ->where('created_at', '<', now()->subDays(7))
             ->count();
 
@@ -306,12 +279,8 @@ class EmailProcessingStatsWidget extends BaseWidget
 
     private function getLeadsLast7DaysComparisonColor($allTimeStats): string
     {
-        $currentPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(7))
-            ->count();
-
-        $previousPeriod = $allTimeStats->where('type', 'lead_created')
-            ->where('created_at', '>=', now()->subDays(14))
+        $currentPeriod = Lead::where('created_at', '>=', now()->subDays(7))->count();
+        $previousPeriod = Lead::where('created_at', '>=', now()->subDays(14))
             ->where('created_at', '<', now()->subDays(7))
             ->count();
 
@@ -321,6 +290,6 @@ class EmailProcessingStatsWidget extends BaseWidget
             return 'danger';
         }
 
-        return 'info';
+        return 'gray';
     }
 }
