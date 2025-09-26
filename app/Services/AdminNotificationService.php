@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Notifications\AdminEmailProcessedNotification;
 use App\Notifications\AdminEmailErrorNotification;
 use App\Notifications\AdminRuleNotMatchedNotification;
+use App\Notifications\AdminCampaignRuleNotMatchedNotification;
 use App\Notifications\AdminDuplicateLeadNotification;
 use Illuminate\Support\Facades\Log;
 
@@ -179,6 +180,37 @@ class AdminNotificationService
     }
 
     /**
+     * Send notification when no campaign rules match a lead
+     */
+    public static function notifyCampaignRuleNotMatched(Lead $lead): void
+    {
+        if (!self::shouldNotifyForCampaignRulesNotMatched()) {
+            return;
+        }
+
+        $admins = self::getAdminsToNotify('admin_notify_campaign_rules_not_matched');
+        
+        foreach ($admins as $admin) {
+            try {
+                $admin->notify(new AdminCampaignRuleNotMatchedNotification($lead));
+
+                Log::info('Admin campaign rule not matched notification sent', [
+                    'admin_email' => $admin->email,
+                    'lead_id' => $lead->id,
+                    'lead_email' => $lead->email,
+                    'client_name' => $lead->client->name ?? 'Unknown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to send admin campaign rule not matched notification', [
+                    'admin_email' => $admin->email,
+                    'error' => $e->getMessage(),
+                    'lead_id' => $lead->id,
+                ]);
+            }
+        }
+    }
+
+    /**
      * Check if admin notifications are enabled for email processing
      */
     private static function shouldNotifyForEmailProcessing(): bool
@@ -212,6 +244,15 @@ class AdminNotificationService
     {
         return config('app.admin_notifications.duplicate_leads', false) ||
                self::hasAdminWithPreference('admin_notify_duplicate_leads', true);
+    }
+
+    /**
+     * Check if admin notifications are enabled for campaign rules not matched
+     */
+    private static function shouldNotifyForCampaignRulesNotMatched(): bool
+    {
+        return config('app.admin_notifications.campaign_rules_not_matched', false) ||
+               self::hasAdminWithPreference('admin_notify_campaign_rules_not_matched', true);
     }
 
     /**

@@ -170,6 +170,14 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
+     * Computed attribute for campaign rules notifications enabled status
+     */
+    public function getCampaignRulesNotificationsEnabledAttribute(): bool
+    {
+        return $this->getPreference('admin_notify_campaign_rules_not_matched', false);
+    }
+
+    /**
      * Get the campaigns this user can view
      */
     public function getVisibleCampaigns(): array

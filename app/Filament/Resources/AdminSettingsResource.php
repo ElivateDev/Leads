@@ -66,6 +66,11 @@ class AdminSettingsResource extends Resource
                             ->helperText('Receive notifications when an email doesn\'t match any client email rules')
                             ->default(false),
 
+                        Forms\Components\Toggle::make('admin_notify_campaign_rules_not_matched')
+                            ->label('Notify When No Campaign Rules Match')
+                            ->helperText('Receive notifications when a lead doesn\'t match any campaign distribution rules')
+                            ->default(false),
+
                         Forms\Components\Toggle::make('admin_notify_duplicate_leads')
                             ->label('Notify on Duplicate Leads')
                             ->helperText('Receive notifications when duplicate leads are detected and handled')
@@ -129,6 +134,14 @@ class AdminSettingsResource extends Resource
                     ->trueColor('success')
                     ->falseColor('gray')
                     ->tooltip('Notified when no client rules match'),
+                Tables\Columns\IconColumn::make('campaign_rules_notifications_enabled')
+                    ->label('Campaign Rules')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->tooltip('Notified when no campaign rules match'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

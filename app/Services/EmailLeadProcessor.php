@@ -599,6 +599,11 @@ class EmailLeadProcessor
                 'email_received_at' => isset($email->date) ? date('Y-m-d H:i:s', strtotime($email->date)) : now(),
             ]);
 
+            // Send notification if no campaign rules matched
+            if ($campaign === null) {
+                AdminNotificationService::notifyCampaignRuleNotMatched($lead);
+            }
+
             // Log successful lead creation
             EmailProcessingLogger::logLeadCreated(
                 $senderEmail,
@@ -1212,13 +1217,6 @@ class EmailLeadProcessor
                 ]);
                 return $rule->campaign_name;
             }
-        }
-
-        // Try to extract campaign from Google Ads URL parameters as fallback
-        $googleAdsCampaign = $this->extractGoogleAdsCampaign($email);
-        if ($googleAdsCampaign) {
-            Log::info('Google Ads campaign detected', ['campaign_id' => $googleAdsCampaign]);
-            return "Google Ads #{$googleAdsCampaign}";
         }
 
         return null;
