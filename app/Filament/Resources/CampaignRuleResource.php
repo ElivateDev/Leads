@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CampaignRuleResource\Pages;
 use App\Models\CampaignRule;
+use App\Services\CampaignRuleService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -113,6 +114,23 @@ class CampaignRuleResource extends Resource
                 Tables\Columns\TextColumn::make('priority')
                     ->sortable()
                     ->alignCenter(),
+                Tables\Columns\TextColumn::make('matching_leads_count')
+                    ->label('Matching Leads')
+                    ->getStateUsing(function ($record) {
+                        if (!$record->is_active) {
+                            return 'Inactive';
+                        }
+                        
+                        return $record->getMatchingLeadsCount();
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        if ($state === 'Inactive') {
+                            return 'gray';
+                        }
+                        return $state > 0 ? 'success' : 'warning';
+                    })
+                    ->tooltip('Number of existing leads that would be affected by this rule'),
                 Tables\Columns\IconColumn::make('is_active')
                     ->boolean()
                     ->sortable(),
@@ -134,11 +152,71 @@ class CampaignRuleResource extends Resource
                 Tables\Filters\TernaryFilter::make('is_active'),
             ])
             ->actions([
+                Tables\Actions\Action::make('apply_to_leads')
+                    ->label('Apply to All Leads')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Apply Campaign Rule to Existing Leads')
+                    ->modalDescription(function ($record) {
+                        $count = $record->getMatchingLeadsCount();
+                        
+                        return "This will apply the '{$record->campaign_name}' campaign to {$count} existing leads that match this rule. This action cannot be undone.";
+                    })
+                    ->modalSubmitActionLabel('Apply Rule')
+                    ->action(function ($record) {
+                        $service = new \App\Services\CampaignRuleService();
+                        $results = $service->applyRuleToAllLeads($record);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Campaign Rule Applied')
+                            ->body("Processed {$results['processed']} leads, updated {$results['updated']} campaigns" . 
+                                   ($results['errors'] > 0 ? ", with {$results['errors']} errors" : ""))
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn ($record) => $record->is_active),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('apply_selected_rules')
+                        ->label('Apply Selected Rules to All Leads')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Apply Selected Campaign Rules')
+                        ->modalDescription('This will apply all selected active campaign rules to existing leads that match their criteria. This action cannot be undone.')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $service = new CampaignRuleService();
+                            $totalResults = [
+                                'processed' => 0,
+                                'updated' => 0,
+                                'errors' => 0,
+                                'rules_applied' => 0,
+                            ];
+
+                            foreach ($records as $rule) {
+                                if ($rule->is_active) {
+                                    $results = $service->applyRuleToAllLeads($rule);
+                                    $totalResults['processed'] += $results['processed'];
+                                    $totalResults['updated'] += $results['updated'];
+                                    $totalResults['errors'] += $results['errors'];
+                                    
+                                    if ($results['updated'] > 0) {
+                                        $totalResults['rules_applied']++;
+                                    }
+                                }
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Campaign Rules Applied')
+                                ->body("Applied {$totalResults['rules_applied']} rules, updated {$totalResults['updated']} campaigns" . 
+                                       ($totalResults['errors'] > 0 ? ", with {$totalResults['errors']} errors" : ""))
+                                ->success()
+                                ->send();
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])

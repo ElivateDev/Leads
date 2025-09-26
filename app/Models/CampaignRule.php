@@ -126,4 +126,17 @@ class CampaignRule extends Model
             'from_email' => 'From Email Address',
         ];
     }
+
+    /**
+     * Get count of leads that would match this rule
+     */
+    public function getMatchingLeadsCount(): int
+    {
+        if (!$this->is_active) {
+            return 0;
+        }
+
+        $service = new \App\Services\CampaignRuleService();
+        return $service->previewRuleApplication($this)->count();
+    }
 }
