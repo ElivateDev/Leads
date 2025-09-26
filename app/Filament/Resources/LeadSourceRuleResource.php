@@ -6,6 +6,7 @@ use App\Filament\Resources\LeadSourceRuleResource\Pages;
 use App\Filament\Resources\LeadSourceRuleResource\RelationManagers;
 use App\Models\LeadSourceRule;
 use App\Models\Client;
+use App\Services\LeadSourceRuleService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -167,6 +168,24 @@ class LeadSourceRuleResource extends Resource
                     ->badge()
                     ->color('gray'),
 
+                TextColumn::make('matching_leads_count')
+                    ->label('Matching Leads')
+                    ->getStateUsing(function ($record) {
+                        if (!$record->is_active) {
+                            return 'Inactive';
+                        }
+                        
+                        return $record->getMatchingLeadsCount();
+                    })
+                    ->badge()
+                    ->color(function ($state) {
+                        if ($state === 'Inactive') {
+                            return 'gray';
+                        }
+                        return $state > 0 ? 'success' : 'warning';
+                    })
+                    ->tooltip('Number of existing leads that would be affected by this rule'),
+
                 BooleanColumn::make('is_active')
                     ->label('Active'),
 
@@ -202,11 +221,71 @@ class LeadSourceRuleResource extends Resource
                     ->label('Active Status'),
             ])
             ->actions([
+                Tables\Actions\Action::make('apply_to_leads')
+                    ->label('Apply to All Leads')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Apply Lead Source Rule to Existing Leads')
+                    ->modalDescription(function ($record) {
+                        $count = $record->getMatchingLeadsCount();
+                        
+                        return "This will apply the '{$record->source_name}' source to {$count} existing leads that match this rule. This action cannot be undone.";
+                    })
+                    ->modalSubmitActionLabel('Apply Rule')
+                    ->action(function ($record) {
+                        $service = new LeadSourceRuleService();
+                        $results = $service->applyRuleToAllLeads($record);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Lead Source Rule Applied')
+                            ->body("Processed {$results['processed']} leads, updated {$results['updated']} sources" . 
+                                   ($results['errors'] > 0 ? ", with {$results['errors']} errors" : ""))
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn ($record) => $record->is_active),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('apply_selected_rules')
+                        ->label('Apply Selected Rules to All Leads')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Apply Selected Lead Source Rules')
+                        ->modalDescription('This will apply all selected active lead source rules to existing leads that match their criteria. This action cannot be undone.')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $service = new LeadSourceRuleService();
+                            $totalResults = [
+                                'processed' => 0,
+                                'updated' => 0,
+                                'errors' => 0,
+                                'rules_applied' => 0,
+                            ];
+
+                            foreach ($records as $rule) {
+                                if ($rule->is_active) {
+                                    $results = $service->applyRuleToAllLeads($rule);
+                                    $totalResults['processed'] += $results['processed'];
+                                    $totalResults['updated'] += $results['updated'];
+                                    $totalResults['errors'] += $results['errors'];
+                                    
+                                    if ($results['updated'] > 0) {
+                                        $totalResults['rules_applied']++;
+                                    }
+                                }
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Lead Source Rules Applied')
+                                ->body("Applied {$totalResults['rules_applied']} rules, updated {$totalResults['updated']} sources" . 
+                                       ($totalResults['errors'] > 0 ? ", with {$totalResults['errors']} errors" : ""))
+                                ->success()
+                                ->send();
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])

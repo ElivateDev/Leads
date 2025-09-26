@@ -182,4 +182,17 @@ class LeadSourceRule extends Model
             'description' => 'nullable|string|max:255',
         ];
     }
+
+    /**
+     * Get count of leads that would match this rule
+     */
+    public function getMatchingLeadsCount(): int
+    {
+        if (!$this->is_active) {
+            return 0;
+        }
+
+        $service = new \App\Services\LeadSourceRuleService();
+        return $service->previewRuleApplication($this)->count();
+    }
 }
